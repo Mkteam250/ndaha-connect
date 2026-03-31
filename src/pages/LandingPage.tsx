@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { GraduationCap, Users, Shield, ArrowRight } from "lucide-react";
+import { GraduationCap, Users, Shield, ArrowRight, LogIn, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const roles = [
   {
@@ -57,7 +58,7 @@ export default function LandingPage() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-12 relative z-10"
+        className="text-center mb-8 relative z-10"
       >
         <div className="inline-flex items-center gap-2 mb-4">
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
@@ -65,9 +66,17 @@ export default function LandingPage() {
           </div>
           <h1 className="text-4xl font-bold text-foreground tracking-tight">NDAHA</h1>
         </div>
-        <p className="text-muted-foreground text-lg max-w-md mx-auto">
-          Attendance Management System — Select your role to continue
+        <p className="text-muted-foreground text-lg max-w-md mx-auto mb-6">
+          Attendance Management System
         </p>
+        <div className="flex gap-3 justify-center">
+          <Button onClick={() => navigate("/login")} className="gradient-primary text-primary-foreground border-0 hover:opacity-90">
+            <LogIn className="w-4 h-4 mr-2" /> Sign In
+          </Button>
+          <Button onClick={() => navigate("/register")} variant="outline">
+            <UserPlus className="w-4 h-4 mr-2" /> Register
+          </Button>
+        </div>
       </motion.div>
 
       <motion.div
