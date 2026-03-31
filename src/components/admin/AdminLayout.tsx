@@ -1,8 +1,9 @@
-import { NavLink as RouterNavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, GraduationCap, Users, Server, Settings, Menu, ChevronLeft } from "lucide-react";
+import { NavLink as RouterNavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { LayoutDashboard, GraduationCap, Users, Server, Settings, Menu, ChevronLeft, LogOut } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
+import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -16,6 +17,13 @@ export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    toast({ title: "Logged out" });
+    navigate("/login");
+  };
 
   const SidebarContent = () => (
     <nav className="flex flex-col gap-1 px-3 py-4 flex-1">
@@ -37,6 +45,13 @@ export default function AdminLayout() {
           </RouterNavLink>
         );
       })}
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors mt-auto"
+      >
+        <LogOut className="w-5 h-5 shrink-0" />
+        {!collapsed && <span>Logout</span>}
+      </button>
     </nav>
   );
 

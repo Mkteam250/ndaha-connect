@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Pencil, ScanLine, MapPin, CheckCircle2, XCircle, Camera } from "lucide-react";
+import { Pencil, ScanLine, CheckCircle2, Camera, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const profile = {
@@ -13,31 +13,11 @@ const profile = {
 
 export default function StudentProfile() {
   const navigate = useNavigate();
-  const [locationEnabled, setLocationEnabled] = useState(false);
-  const [locationDenied, setLocationDenied] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
   const [masterName] = useState("Dr. François Bizimungu");
 
-  const handleEnableLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => {
-          setLocationEnabled(true);
-          setLocationDenied(false);
-        },
-        () => {
-          setLocationDenied(true);
-          setLocationEnabled(false);
-        }
-      );
-    } else {
-      setLocationDenied(true);
-    }
-  };
-
   const handleSimulateScan = () => {
-    // Simulate successful QR scan
     setScanning(true);
     setTimeout(() => {
       setScanning(false);
@@ -97,34 +77,8 @@ export default function StudentProfile() {
         </h3>
         <p className="text-sm text-muted-foreground mb-4">Scan your master's QR code to mark your attendance.</p>
 
-        {/* Location permission */}
-        {!locationEnabled && (
-          <div className="rounded-lg border border-border bg-muted/30 p-4 mb-4">
-            <div className="flex items-center gap-3 mb-3">
-              <MapPin className="w-5 h-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Location Required</p>
-                <p className="text-xs text-muted-foreground">You must enable location to check in.</p>
-              </div>
-            </div>
-            {locationDenied && (
-              <div className="flex items-center gap-2 mb-3 text-destructive">
-                <XCircle className="w-4 h-4" />
-                <p className="text-xs">Location denied. Please allow location in your browser settings.</p>
-              </div>
-            )}
-            <Button onClick={handleEnableLocation} variant="outline" className="w-full">
-              <MapPin className="w-4 h-4 mr-2" /> Enable Location
-            </Button>
-          </div>
-        )}
-
-        {locationEnabled && !checkedIn && (
+        {!checkedIn && (
           <>
-            <div className="flex items-center gap-2 mb-4 text-student">
-              <CheckCircle2 className="w-4 h-4" />
-              <p className="text-xs font-medium">Location enabled</p>
-            </div>
             <div className="aspect-video rounded-lg bg-muted/50 border border-dashed border-border flex flex-col items-center justify-center mb-4">
               {scanning ? (
                 <>

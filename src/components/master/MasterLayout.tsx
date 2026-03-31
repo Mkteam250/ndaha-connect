@@ -1,8 +1,9 @@
-import { NavLink as RouterNavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Calendar, Users, FileText, User, Bell, ChevronLeft, Menu } from "lucide-react";
+import { NavLink as RouterNavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { LayoutDashboard, CheckSquare, Calendar, Users, FileText, User, Bell, ChevronLeft, Menu, LogOut } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
+import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/master/dashboard" },
@@ -17,6 +18,13 @@ export default function MasterLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    toast({ title: "Logged out" });
+    navigate("/login");
+  };
 
   const SidebarContent = () => (
     <nav className="flex flex-col gap-1 px-3 py-4 flex-1">
@@ -38,12 +46,18 @@ export default function MasterLayout() {
           </RouterNavLink>
         );
       })}
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors mt-auto"
+      >
+        <LogOut className="w-5 h-5 shrink-0" />
+        {!collapsed && <span>Logout</span>}
+      </button>
     </nav>
   );
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop sidebar */}
       <aside className={`hidden lg:flex flex-col border-r border-border bg-card transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}>
         <div className="h-14 flex items-center justify-between px-4 border-b border-border">
           {!collapsed && <span className="font-bold text-foreground text-lg">NDAHA</span>}
@@ -54,27 +68,14 @@ export default function MasterLayout() {
         <SidebarContent />
       </aside>
 
-      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40 lg:hidden"
-            onClick={() => setMobileOpen(false)}
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40 lg:hidden" onClick={() => setMobileOpen(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {mobileOpen && (
-          <motion.aside
-            initial={{ x: -260 }}
-            animate={{ x: 0 }}
-            exit={{ x: -260 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-0 top-0 h-full w-60 border-r border-border bg-card z-50 flex flex-col lg:hidden"
-          >
+          <motion.aside initial={{ x: -260 }} animate={{ x: 0 }} exit={{ x: -260 }} transition={{ type: "spring", damping: 25, stiffness: 300 }} className="fixed left-0 top-0 h-full w-60 border-r border-border bg-card z-50 flex flex-col lg:hidden">
             <div className="h-14 flex items-center px-4 border-b border-border">
               <span className="font-bold text-foreground text-lg">NDAHA</span>
             </div>
@@ -83,7 +84,6 @@ export default function MasterLayout() {
         )}
       </AnimatePresence>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-3">
