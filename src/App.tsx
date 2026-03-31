@@ -48,7 +48,7 @@ const App = () => (
             <Route path="calendar" element={<MasterCalendar />} />
             <Route path="students" element={<MasterStudents />} />
             <Route path="reports" element={<MasterReports />} />
-            <Route path="settings" element={<MasterSettings />} />
+            <Route path="profile" element={<MasterProfile />} />
           </Route>
 
           {/* Student Portal */}

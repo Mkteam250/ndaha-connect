@@ -10,7 +10,7 @@ const navItems = [
   { label: "Calendar", icon: Calendar, path: "/master/calendar" },
   { label: "Students", icon: Users, path: "/master/students" },
   { label: "Reports", icon: FileText, path: "/master/reports" },
-  { label: "Settings", icon: Settings, path: "/master/settings" },
+  { label: "Profile", icon: User, path: "/master/profile" },
 ];
 
 export default function MasterLayout() {
