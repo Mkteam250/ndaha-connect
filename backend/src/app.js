@@ -7,6 +7,9 @@ const studentRoutes = require("./routes/studentRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const qrRoutes = require("./routes/qrRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const masterRoutes = require("./routes/masterRoutes");
+const profileRoutes = require("./routes/profileRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -34,6 +37,9 @@ app.use("/api/students", studentRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/masters", masterRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ── 404 Handler ────────────────────────────────────────────
 app.all("*", (req, res, next) => {

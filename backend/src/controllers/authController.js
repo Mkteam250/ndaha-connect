@@ -8,8 +8,8 @@ exports.registerValidation = [
     .trim()
     .notEmpty()
     .withMessage("Name is required")
-    .isLength({ max: 50 })
-    .withMessage("Name cannot exceed 50 characters"),
+    .isLength({ max: 100 })
+    .withMessage("Name cannot exceed 100 characters"),
 
   body("email")
     .trim()
@@ -60,21 +60,13 @@ const sendTokenResponse = (user, statusCode, res) => {
 
   res.cookie("token", token, cookieOptions);
 
-  // Remove password from output
   user.password = undefined;
 
   res.status(statusCode).json({
     success: true,
     token,
     data: {
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        studentLimit: user.studentLimit,
-        createdAt: user.createdAt,
-      },
+      user: user.toProfileJSON(),
     },
   });
 };
@@ -89,7 +81,12 @@ exports.register = async (req, res, next) => {
       return next(new AppError("An account with this email already exists", 400));
     }
 
-    const user = await User.create({ name, email, password, role: role || "student" });
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || "student",
+    });
 
     sendTokenResponse(user, 201, res);
   } catch (error) {
@@ -100,7 +97,7 @@ exports.register = async (req, res, next) => {
 // ── Login ──────────────────────────────────────────────────
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     const user = await User.findOne({ email }).select("+password");
 
@@ -108,10 +105,24 @@ exports.login = async (req, res, next) => {
       return next(new AppError("Invalid email or password", 401));
     }
 
+    // If role is specified, verify it matches
+    if (role && user.role !== role) {
+      return next(
+        new AppError(
+          `This account is registered as a ${user.role}, not a ${role}`,
+          403
+        )
+      );
+    }
+
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
       return next(new AppError("Invalid email or password", 401));
+    }
+
+    if (user.status === "suspended") {
+      return next(new AppError("Your account has been suspended", 403));
     }
 
     sendTokenResponse(user, 200, res);
@@ -128,14 +139,7 @@ exports.getMe = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          studentLimit: user.studentLimit,
-          createdAt: user.createdAt,
-        },
+        user: user.toProfileJSON(),
       },
     });
   } catch (error) {

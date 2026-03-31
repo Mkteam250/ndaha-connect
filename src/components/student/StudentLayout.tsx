@@ -1,5 +1,5 @@
 import { NavLink as RouterNavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ScanLine, User, LogOut, Menu, ChevronLeft, GraduationCap } from "lucide-react";
+import { LayoutDashboard, ScanLine, User, LogOut, Menu, ChevronLeft, GraduationCap, Search, Star } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/student/dashboard" },
+  { label: "Browse Masters", icon: Search, path: "/student/masters" },
+  { label: "My Masters", icon: Star, path: "/student/my-masters" },
   { label: "Check In", icon: ScanLine, path: "/student/check-in" },
   { label: "Profile", icon: User, path: "/student/profile" },
 ];

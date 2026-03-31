@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Name is required"],
       trim: true,
-      maxlength: [50, "Name cannot exceed 50 characters"],
+      maxlength: [100, "Name cannot exceed 100 characters"],
     },
     email: {
       type: String,
@@ -32,9 +32,59 @@ const userSchema = new mongoose.Schema(
       enum: ["master", "student", "admin"],
       default: "student",
     },
+    avatar: {
+      type: String,
+      default: "",
+    },
+    phone: {
+      type: String,
+      default: "",
+    },
+    bio: {
+      type: String,
+      maxlength: [500, "Bio cannot exceed 500 characters"],
+      default: "",
+    },
+    subject: {
+      type: String,
+      default: "",
+    },
+    availability: {
+      type: String,
+      default: "",
+    },
+    country: {
+      type: String,
+      default: "",
+    },
+    province: {
+      type: String,
+      default: "",
+    },
+    district: {
+      type: String,
+      default: "",
+    },
     studentLimit: {
       type: Number,
       default: 5,
+    },
+    registeredMasters: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    registeredStudents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    status: {
+      type: String,
+      enum: ["active", "suspended"],
+      default: "active",
     },
   },
   {
@@ -43,6 +93,16 @@ const userSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+
+userSchema.virtual("initials").get(function () {
+  if (!this.name) return "??";
+  return this.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+});
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {
@@ -64,6 +124,27 @@ userSchema.methods.generateAuthToken = function () {
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRE }
   );
+};
+
+userSchema.methods.toProfileJSON = function () {
+  return {
+    id: this._id,
+    name: this.name,
+    email: this.email,
+    role: this.role,
+    avatar: this.avatar,
+    phone: this.phone,
+    bio: this.bio,
+    subject: this.subject,
+    availability: this.availability,
+    country: this.country,
+    province: this.province,
+    district: this.district,
+    initials: this.initials,
+    studentLimit: this.studentLimit,
+    status: this.status,
+    createdAt: this.createdAt,
+  };
 };
 
 module.exports = mongoose.model("User", userSchema);

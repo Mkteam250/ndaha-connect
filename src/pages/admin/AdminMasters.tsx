@@ -1,25 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { masters as initialMasters } from "@/lib/mock-data";
+import { api, type AdminMaster } from "@/lib/api";
 import { Search, Eye, Pencil, Trash2, Plus, Minus } from "lucide-react";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminMasters() {
-  const [masters, setMasters] = useState(initialMasters);
+  const { toast } = useToast();
+  const [masters, setMasters] = useState<AdminMaster[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [editLimitId, setEditLimitId] = useState<string | null>(null);
   const [newLimit, setNewLimit] = useState(5);
+  const [viewMaster, setViewMaster] = useState<AdminMaster | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  const fetchMasters = useCallback(async () => {
+    try {
+      const res = await api.getAdminMasters();
+      setMasters(res.data?.masters || []);
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : "Failed to load", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchMasters();
+  }, [fetchMasters]);
 
   const filtered = masters.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
 
-  const toggleStatus = (id: string) => {
-    setMasters((prev) => prev.map((m) => m.id === id ? { ...m, status: m.status === "active" ? "suspended" as const : "active" as const } : m));
+  const toggleStatus = async (id: string) => {
+    const master = masters.find((m) => m.id === id);
+    if (!master) return;
+    const newStatus = master.status === "active" ? "suspended" : "active";
+    setToggling(id);
+    try {
+      await api.updateMasterStatus(id, newStatus);
+      setMasters((prev) => prev.map((m) => m.id === id ? { ...m, status: newStatus } : m));
+      toast({ title: `Master ${newStatus}` });
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : "Failed to update status", variant: "destructive" });
+    } finally {
+      setToggling(null);
+    }
   };
 
   const openEditLimit = (id: string) => {
@@ -27,12 +60,37 @@ export default function AdminMasters() {
     if (m) { setNewLimit(m.studentLimit); setEditLimitId(id); }
   };
 
-  const saveLimit = () => {
-    if (editLimitId) {
+  const saveLimit = async () => {
+    if (!editLimitId) return;
+    try {
+      await api.updateMasterLimit(editLimitId, newLimit);
       setMasters((prev) => prev.map((m) => m.id === editLimitId ? { ...m, studentLimit: newLimit } : m));
-      setEditLimitId(null);
+      toast({ title: "Limit updated" });
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : "Failed to update limit", variant: "destructive" });
     }
+    setEditLimitId(null);
   };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.deleteAdminUser(deleteTarget);
+      setMasters((prev) => prev.filter((m) => m.id !== deleteTarget));
+      toast({ title: "Master deleted" });
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : "Failed to delete", variant: "destructive" });
+    }
+    setDeleteTarget(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-admin border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -63,12 +121,12 @@ export default function AdminMasters() {
                 <motion.tr key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <AvatarBadge initials={m.avatar} size="sm" accentClass="bg-admin-muted text-admin" />
+                      <AvatarBadge initials={m.initials} size="sm" accentClass="bg-admin-muted text-admin" />
                       <span className="font-medium text-foreground">{m.name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{m.email}</td>
-                  <td className="px-4 py-3 text-foreground">{m.studentsEnrolled}</td>
+                  <td className="px-4 py-3 text-foreground">{m.studentCount}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <span className="text-foreground font-medium">{m.studentLimit}</span>
@@ -82,19 +140,54 @@ export default function AdminMasters() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Eye className="w-4 h-4" /></button>
-                      <button onClick={() => toggleStatus(m.id)} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground text-xs font-medium">
-                        {m.status === "active" ? "Suspend" : "Activate"}
+                      <button onClick={() => setViewMaster(m)} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Eye className="w-4 h-4" /></button>
+                      <button onClick={() => toggleStatus(m.id)} disabled={toggling === m.id} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground text-xs font-medium">
+                        {toggling === m.id ? "..." : m.status === "active" ? "Suspend" : "Activate"}
                       </button>
                       <button onClick={() => setDeleteTarget(m.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </motion.tr>
               ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No masters found.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* View Master */}
+      <Sheet open={!!viewMaster} onOpenChange={() => setViewMaster(null)}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>Master Profile</SheetTitle></SheetHeader>
+          {viewMaster && (
+            <div className="mt-6 space-y-4">
+              <div className="flex justify-center">
+                <AvatarBadge initials={viewMaster.initials} size="lg" accentClass="bg-master-muted text-master" />
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-semibold text-foreground">{viewMaster.name}</p>
+                <p className="text-sm text-muted-foreground">{viewMaster.email}</p>
+              </div>
+              <div className="space-y-3 pt-4 border-t border-border">
+                {[
+                  ["Subject", viewMaster.subject || "—"],
+                  ["Bio", viewMaster.bio || "—"],
+                  ["Students", `${viewMaster.studentCount} / ${viewMaster.studentLimit}`],
+                  ["Status", viewMaster.status],
+                  ["Joined", new Date(viewMaster.createdAt).toLocaleDateString()],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-medium text-foreground text-right max-w-[60%]">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Edit limit dialog */}
       <Dialog open={!!editLimitId} onOpenChange={() => setEditLimitId(null)}>
@@ -119,7 +212,7 @@ export default function AdminMasters() {
         onOpenChange={() => setDeleteTarget(null)}
         title="Delete Master"
         description="This will permanently remove this master account and all associated data."
-        onConfirm={() => { setMasters((prev) => prev.filter((m) => m.id !== deleteTarget)); setDeleteTarget(null); }}
+        onConfirm={handleDelete}
         confirmLabel="Delete"
         destructive
       />

@@ -29,7 +29,7 @@ export default function AdminLayout() {
   const handleLogout = async () => {
     await logout();
     toast({ title: "Logged out" });
-    navigate("/login");
+    navigate("/admin/login");
   };
 
   const SidebarContent = () => (

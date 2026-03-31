@@ -3,34 +3,27 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { api, type Student } from "@/lib/api";
-import { Search, Eye, Pencil, Trash2, Plus } from "lucide-react";
+import { api, type RegisteredStudent } from "@/lib/api";
+import { Search, Eye, Trash2, MapPin, Mail, Phone, BookOpen, User } from "lucide-react";
 import { motion } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 export default function MasterStudents() {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [studentsList, setStudentsList] = useState<Student[]>([]);
+  const [studentsList, setStudentsList] = useState<RegisteredStudent[]>([]);
+  const [studentLimit, setStudentLimit] = useState(5);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
-  const [viewStudent, setViewStudent] = useState<Student | null>(null);
-  const [editStudent, setEditStudent] = useState<Student | null>(null);
-  const [addingNew, setAddingNew] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", email: "", phone: "", country: "", province: "" });
-
-  const LIMIT = user?.studentLimit || 5;
+  const [viewStudent, setViewStudent] = useState<RegisteredStudent | null>(null);
 
   const fetchStudents = useCallback(async () => {
     try {
-      const res = await api.getStudents();
+      const res = await api.getMyStudents();
       setStudentsList(res.data?.students || []);
+      setStudentLimit(res.data?.studentLimit || 5);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load students";
       toast({ title: msg, variant: "destructive" });
@@ -44,15 +37,15 @@ export default function MasterStudents() {
   }, [fetchStudents]);
 
   const filtered = studentsList.filter((s) =>
-    `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(search.toLowerCase())
+    `${s.name} ${s.email}`.toLowerCase().includes(search.toLowerCase())
   );
-  const atLimit = studentsList.length >= LIMIT;
+  const atLimit = studentsList.length >= studentLimit;
 
   const handleRemove = async () => {
     if (!removeTarget) return;
     try {
-      await api.deleteStudent(removeTarget);
-      setStudentsList(prev => prev.filter(s => s._id !== removeTarget));
+      await api.removeStudent(removeTarget);
+      setStudentsList(prev => prev.filter(s => s.id !== removeTarget));
       toast({ title: "Student removed" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to remove student";
@@ -60,42 +53,6 @@ export default function MasterStudents() {
     }
     setRemoveTarget(null);
   };
-
-  const openEdit = (s: Student) => {
-    setEditStudent(s);
-    setAddingNew(false);
-    setEditForm({ firstName: s.firstName, lastName: s.lastName, email: s.email, phone: s.phone, country: s.country, province: s.province });
-  };
-
-  const openAdd = () => {
-    setAddingNew(true);
-    setEditStudent(null);
-    setEditForm({ firstName: "", lastName: "", email: "", phone: "", country: "", province: "" });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editForm.firstName || !editForm.lastName || !editForm.email) return;
-    setSaving(true);
-    try {
-      if (editStudent) {
-        await api.updateStudent(editStudent._id, editForm);
-        toast({ title: "Student updated" });
-      } else {
-        await api.createStudent(editForm);
-        toast({ title: "Student added" });
-      }
-      await fetchStudents();
-      setEditStudent(null);
-      setAddingNew(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to save student";
-      toast({ title: msg, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const showEditPanel = !!editStudent || addingNew;
 
   if (loading) {
     return (
@@ -107,18 +64,14 @@ export default function MasterStudents() {
 
   return (
     <div>
-      <PageHeader title="Students" description="Manage your enrolled students">
-        <Button disabled={atLimit} onClick={openAdd} className="gradient-master text-master-foreground border-0 hover:opacity-90" title={atLimit ? "Contact admin to increase limit" : ""}>
-          <Plus className="w-4 h-4 mr-1" /> Add Student
-        </Button>
-      </PageHeader>
+      <PageHeader title="My Students" description="Students registered under you" />
 
       {/* Limit banner */}
       <div className="mb-4 rounded-lg border border-border bg-card p-3 flex items-center gap-3">
         <div className="flex-1">
-          <p className="text-sm text-foreground font-medium">{studentsList.length}/{LIMIT} students (limit {atLimit ? "reached" : ""})</p>
+          <p className="text-sm text-foreground font-medium">{studentsList.length}/{studentLimit} students {atLimit ? "(limit reached)" : ""}</p>
           <div className="w-full h-2 bg-muted rounded-full mt-1 overflow-hidden">
-            <div className={`h-full rounded-full ${atLimit ? "bg-destructive" : "gradient-master"}`} style={{ width: `${Math.min((studentsList.length / LIMIT) * 100, 100)}%` }} />
+            <div className={`h-full rounded-full ${atLimit ? "bg-destructive" : "gradient-master"}`} style={{ width: `${Math.min((studentsList.length / studentLimit) * 100, 100)}%` }} />
           </div>
         </div>
         {atLimit && <p className="text-xs text-muted-foreground">Contact admin to increase your student limit.</p>}
@@ -131,72 +84,94 @@ export default function MasterStudents() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Student</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Country</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s, i) => (
-                <motion.tr key={s._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors">
-                  <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <AvatarBadge initials={`${s.firstName[0]}${s.lastName[0]}`.toUpperCase()} size="sm" accentClass="bg-master-muted text-master" />
-                      <div>
-                        <p className="font-medium text-foreground">{s.firstName} {s.lastName}</p>
-                        <p className="text-xs text-muted-foreground md:hidden">{s.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{s.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{s.country || "—"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => setViewStudent(s)} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Eye className="w-4 h-4" /></button>
-                      <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => setRemoveTarget(s._id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No students found.</td></tr>
-              )}
-            </tbody>
-          </table>
+      {filtered.length === 0 ? (
+        <div className="text-center py-12">
+          <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No students registered yet. Students can browse and register under you.</p>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((s, i) => (
+            <motion.div
+              key={s.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="rounded-xl border border-border bg-card p-5 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-12 h-12 rounded-full bg-student-muted text-student flex items-center justify-center text-base font-bold shrink-0">
+                  {s.initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-foreground truncate">{s.name}</h3>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Mail className="w-3.5 h-3.5" /> {s.email}
+                  </p>
+                  {s.country && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3" /> {s.country}{s.province ? `, ${s.province}` : ""}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {s.bio && (
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{s.bio}</p>
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setViewStudent(s)} className="flex-1">
+                  <Eye className="w-3.5 h-3.5 mr-1" /> View
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRemoveTarget(s.id)}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* View Student */}
       <Sheet open={!!viewStudent} onOpenChange={() => setViewStudent(null)}>
         <SheetContent>
           <SheetHeader><SheetTitle>Student Profile</SheetTitle></SheetHeader>
           {viewStudent && (
-            <div className="mt-6 space-y-4">
-              <div className="flex justify-center">
-                <AvatarBadge initials={`${viewStudent.firstName[0]}${viewStudent.lastName[0]}`.toUpperCase()} size="lg" accentClass="bg-master-muted text-master" />
+            <div className="mt-6 space-y-5">
+              <div className="flex flex-col items-center">
+                <div className="w-20 h-20 rounded-full bg-student-muted text-student flex items-center justify-center text-2xl font-bold">
+                  {viewStudent.initials}
+                </div>
+                <h2 className="text-lg font-semibold text-foreground mt-3">{viewStudent.name}</h2>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5" /> {viewStudent.email}
+                </p>
+                <span className="text-xs bg-student-muted text-student px-2 py-0.5 rounded-full font-medium mt-2">Student</span>
               </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold text-foreground">{viewStudent.firstName} {viewStudent.lastName}</p>
-                <p className="text-sm text-muted-foreground">{viewStudent.email}</p>
-              </div>
-              <div className="space-y-3 pt-4 border-t border-border">
+
+              {viewStudent.bio && (
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <p className="text-sm font-medium text-foreground mb-1">Bio</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{viewStudent.bio}</p>
+                </div>
+              )}
+
+              <div className="space-y-3 pt-2 border-t border-border">
                 {[
                   ["Phone", viewStudent.phone || "—"],
                   ["Country", viewStudent.country || "—"],
                   ["Province", viewStudent.province || "—"],
-                  ["Enrolled", new Date(viewStudent.enrolledDate).toLocaleDateString()],
-                  ["Status", viewStudent.status],
+                  ["District", viewStudent.district || "—"],
+                  ["Other Masters", `${viewStudent.masterCount}`],
+                  ["Registered", new Date(viewStudent.registeredAt).toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" })],
                 ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between text-sm">
+                  <div key={label as string} className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{label}</span>
                     <span className="font-medium text-foreground">{value}</span>
                   </div>
@@ -207,29 +182,11 @@ export default function MasterStudents() {
         </SheetContent>
       </Sheet>
 
-      {/* Edit/Add Student */}
-      <Sheet open={showEditPanel} onOpenChange={() => { setEditStudent(null); setAddingNew(false); }}>
-        <SheetContent>
-          <SheetHeader><SheetTitle>{editStudent ? "Edit Student" : "Add Student"}</SheetTitle></SheetHeader>
-          <div className="mt-6 space-y-4">
-            <div><Label>First Name</Label><Input value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} /></div>
-            <div><Label>Last Name</Label><Input value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} /></div>
-            <div><Label>Email</Label><Input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></div>
-            <div><Label>Phone</Label><Input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></div>
-            <div><Label>Country</Label><Input value={editForm.country} onChange={e => setEditForm({ ...editForm, country: e.target.value })} /></div>
-            <div><Label>Province</Label><Input value={editForm.province} onChange={e => setEditForm({ ...editForm, province: e.target.value })} /></div>
-            <Button onClick={handleSaveEdit} disabled={saving} className="gradient-master text-master-foreground border-0 hover:opacity-90 w-full">
-              {saving ? "Saving..." : editStudent ? "Save Changes" : "Add Student"}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
-
       <ConfirmModal
         open={!!removeTarget}
         onOpenChange={() => setRemoveTarget(null)}
         title="Remove Student"
-        description="This will remove the student from your enrollment. This action cannot be undone."
+        description="This will remove the student from your enrollment. They can register again later."
         onConfirm={handleRemove}
         confirmLabel="Remove"
         destructive

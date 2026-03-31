@@ -13,8 +13,65 @@ export interface User {
   name: string;
   email: string;
   role: "master" | "student" | "admin";
+  avatar?: string;
+  bio?: string;
+  phone?: string;
+  subject?: string;
+  availability?: string;
+  country?: string;
+  province?: string;
+  district?: string;
+  initials?: string;
+  status?: string;
   studentLimit?: number;
   createdAt: string;
+}
+
+export interface MasterProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  initials: string;
+  bio: string | null;
+  subject: string | null;
+  availability: string | null;
+  country: string | null;
+  province: string | null;
+  district: string | null;
+  studentCount: number;
+  studentLimit: number;
+  createdAt: string;
+}
+
+export interface RegisteredMaster {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  initials: string;
+  bio: string | null;
+  subject: string | null;
+  availability: string | null;
+  country: string | null;
+  province: string | null;
+  studentCount: number;
+  studentLimit: number;
+}
+
+export interface RegisteredStudent {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  initials: string;
+  phone: string | null;
+  bio: string | null;
+  country: string | null;
+  province: string | null;
+  district: string | null;
+  masterCount: number;
+  registeredAt: string;
 }
 
 export interface Student {
@@ -124,6 +181,70 @@ export interface ReportData {
   }>;
 }
 
+export interface AdminStats {
+  totalMasters: number;
+  totalStudents: number;
+  activeMasters: number;
+  suspendedMasters: number;
+  totalUsers: number;
+}
+
+export interface AdminMaster {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  initials: string;
+  bio: string | null;
+  subject: string | null;
+  status: string;
+  studentLimit: number;
+  studentCount: number;
+  createdAt: string;
+}
+
+export interface AdminStudent {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  initials: string;
+  bio: string | null;
+  country: string | null;
+  province: string | null;
+  masterCount: number;
+  createdAt: string;
+}
+
+export interface AdminRecentUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  initials: string;
+  createdAt: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar: string | null;
+  initials: string;
+  bio: string | null;
+  subject: string | null;
+  availability: string | null;
+  phone: string | null;
+  country: string | null;
+  province: string | null;
+  district: string | null;
+  registeredMasters: Array<{ id: string; name: string; email: string; avatar: string | null; subject: string | null; initials: string }>;
+  registeredStudents: Array<{ id: string; name: string; email: string; avatar: string | null; initials: string }>;
+  createdAt: string;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -167,7 +288,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  login: (body: { email: string; password: string }) =>
+  login: (body: { email: string; password: string; role?: string }) =>
     request<{ user: User }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(body),
@@ -244,4 +365,44 @@ export const api = {
     request<StudentDashboardData>("/dashboard/student"),
 
   getReports: () => request<ReportData>("/dashboard/reports"),
+
+  // Masters (student-facing)
+  getAllMasters: () => request<{ masters: RegisteredMaster[]; count: number }>("/masters"),
+  getMyMasters: () => request<{ masters: RegisteredMaster[]; count: number }>("/masters/my-masters"),
+  getMasterProfile: (id: string) => request<{ master: MasterProfile }>(`/masters/${id}`),
+  registerUnderMaster: (id: string) =>
+    request(`/masters/${id}/register`, { method: "POST" }),
+  unregisterFromMaster: (id: string) =>
+    request(`/masters/${id}/unregister`, { method: "DELETE" }),
+
+  // Masters (master-facing)
+  getMyStudents: () => request<{ students: RegisteredStudent[]; count: number; studentLimit: number }>("/masters/my-students"),
+  removeStudent: (studentId: string) =>
+    request(`/masters/students/${studentId}`, { method: "DELETE" }),
+
+  // Profile
+  getProfile: () => request<{ user: UserProfile }>("/profile/me"),
+  updateProfile: (body: Record<string, string>) =>
+    request<{ user: UserProfile }>("/profile/me", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getUserProfile: (id: string) => request<{ user: UserProfile }>(`/profile/${id}`),
+
+  // Admin
+  getAdminStats: () => request<{ stats: AdminStats; recentUsers: AdminRecentUser[] }>("/admin/stats"),
+  getAdminMasters: () => request<{ masters: AdminMaster[]; count: number }>("/admin/masters"),
+  getAdminStudents: () => request<{ students: AdminStudent[]; count: number }>("/admin/students"),
+  updateMasterStatus: (id: string, status: string) =>
+    request(`/admin/masters/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  updateMasterLimit: (id: string, studentLimit: number) =>
+    request(`/admin/masters/${id}/limit`, {
+      method: "PUT",
+      body: JSON.stringify({ studentLimit }),
+    }),
+  deleteAdminUser: (id: string) =>
+    request(`/admin/users/${id}`, { method: "DELETE" }),
 };

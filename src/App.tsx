@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 // Auth pages
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import AdminLoginPage from "./pages/admin/AdminLoginPage";
 
 // Layouts
 import MasterLayout from "./components/master/MasterLayout";
@@ -31,6 +32,8 @@ import StudentSignup from "./pages/student/StudentSignup";
 import StudentProfile from "./pages/student/StudentProfile";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentCheckIn from "./pages/student/StudentCheckIn";
+import StudentBrowseMasters from "./pages/student/StudentBrowseMasters";
+import StudentMyMasters from "./pages/student/StudentMyMasters";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -87,6 +90,16 @@ const App = () => (
               }
             />
 
+            {/* Hidden Admin Login - not linked from main site */}
+            <Route
+              path="/admin/login"
+              element={
+                <AuthRedirect>
+                  <AdminLoginPage />
+                </AuthRedirect>
+              }
+            />
+
             {/* Master Portal */}
             <Route
               path="/master"
@@ -122,6 +135,8 @@ const App = () => (
               }
             >
               <Route path="dashboard" element={<StudentDashboard />} />
+              <Route path="masters" element={<StudentBrowseMasters />} />
+              <Route path="my-masters" element={<StudentMyMasters />} />
               <Route path="check-in" element={<StudentCheckIn />} />
               <Route path="profile" element={<StudentProfile />} />
               <Route path="signup" element={<StudentSignup />} />

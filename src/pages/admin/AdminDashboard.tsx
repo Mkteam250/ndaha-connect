@@ -1,11 +1,43 @@
+import { useState, useEffect } from "react";
 import { Users, GraduationCap, Activity, Database, Cpu, HardDrive, Clock, BarChart3 } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
-import { masters, students, recentActivity } from "@/lib/mock-data";
+import { api, type AdminStats, type AdminRecentUser } from "@/lib/api";
 import { motion } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [recentUsers, setRecentUsers] = useState<AdminRecentUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await api.getAdminStats();
+        if (res.data) {
+          setStats(res.data.stats);
+          setRecentUsers(res.data.recentUsers);
+        }
+      } catch (err: unknown) {
+        toast({ title: err instanceof Error ? err.message : "Failed to load dashboard", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-admin border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader title="Admin Dashboard" description="System overview and platform metrics" />
@@ -61,47 +93,37 @@ export default function AdminDashboard() {
       {/* Platform stats */}
       <h3 className="text-sm font-semibold text-foreground mb-3">Platform Stats</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={GraduationCap} label="Total Masters" value={masters.length} accentClass="bg-master-muted text-master" />
-        <StatCard icon={Users} label="Total Students" value={students.length} accentClass="bg-student-muted text-student" />
-        <StatCard icon={Activity} label="Active Sessions" value={2} accentClass="bg-admin-muted text-admin" />
-        <StatCard icon={BarChart3} label="Attendance Records" value={156} trend={12} accentClass="bg-master-muted text-master" />
+        <StatCard icon={GraduationCap} label="Total Masters" value={stats?.totalMasters || 0} accentClass="bg-master-muted text-master" />
+        <StatCard icon={Users} label="Total Students" value={stats?.totalStudents || 0} accentClass="bg-student-muted text-student" />
+        <StatCard icon={Activity} label="Active Masters" value={stats?.activeMasters || 0} accentClass="bg-admin-muted text-admin" />
+        <StatCard icon={BarChart3} label="Total Users" value={stats?.totalUsers || 0} accentClass="bg-master-muted text-master" />
       </div>
 
-      {/* Recent registrations & activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Recent Registrations</h3>
-          <div className="space-y-3">
-            {students.slice(0, 5).map((s) => (
-              <div key={s.id} className="flex items-center gap-3">
-                <AvatarBadge initials={s.avatar} size="sm" accentClass="bg-student-muted text-student" />
+      {/* Recent users */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Recent Registrations</h3>
+        <div className="space-y-3">
+          {recentUsers.length > 0 ? (
+            recentUsers.map((u) => (
+              <div key={u.id} className="flex items-center gap-3">
+                <AvatarBadge initials={u.initials} size="sm" accentClass={u.role === "master" ? "bg-master-muted text-master" : "bg-student-muted text-student"} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{s.firstName} {s.lastName}</p>
-                  <p className="text-xs text-muted-foreground">{s.enrolledDate}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{u.name}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</p>
                 </div>
-                <span className="text-xs bg-student-muted text-student px-2 py-0.5 rounded-full">Student</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === "master" ? "bg-master-muted text-master" : "bg-student-muted text-student"}`}>
+                  {u.role}
+                </span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.status === "active" ? "bg-green-500/10 text-green-500" : "bg-destructive/10 text-destructive"}`}>
+                  {u.status}
+                </span>
               </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Activity Log</h3>
-          <div className="space-y-3 max-h-[300px] overflow-auto">
-            {recentActivity.map((a) => (
-              <div key={a.id} className="flex items-start gap-3">
-                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                  a.type === "attendance" ? "bg-master" : a.type === "registration" ? "bg-student" : a.type === "limit_change" ? "bg-admin" : "bg-muted-foreground"
-                }`} />
-                <div>
-                  <p className="text-sm text-foreground">{a.message}</p>
-                  <p className="text-xs text-muted-foreground">{a.timestamp}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">No recent users</p>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }
