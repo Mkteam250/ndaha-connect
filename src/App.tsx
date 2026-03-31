@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
@@ -27,6 +29,8 @@ import MasterProfile from "./pages/master/MasterProfile";
 // Student pages
 import StudentSignup from "./pages/student/StudentSignup";
 import StudentProfile from "./pages/student/StudentProfile";
+import StudentDashboard from "./pages/student/StudentDashboard";
+import StudentCheckIn from "./pages/student/StudentCheckIn";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -37,47 +41,113 @@ import AdminSettings from "./pages/admin/AdminSettings";
 
 const queryClient = new QueryClient();
 
+function AuthRedirect({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (user) {
+    const redirectMap: Record<string, string> = {
+      master: "/master/dashboard",
+      student: "/student/dashboard",
+      admin: "/admin/dashboard",
+    };
+    return <Navigate to={redirectMap[user.role] || "/"} replace />;
+  }
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route
+              path="/login"
+              element={
+                <AuthRedirect>
+                  <LoginPage />
+                </AuthRedirect>
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                <AuthRedirect>
+                  <RegisterPage />
+                </AuthRedirect>
+              }
+            />
 
-          {/* Master Portal */}
-          <Route path="/master" element={<MasterLayout />}>
-            <Route path="dashboard" element={<MasterDashboard />} />
-            <Route path="attendance" element={<MasterAttendance />} />
-            <Route path="calendar" element={<MasterCalendar />} />
-            <Route path="students" element={<MasterStudents />} />
-            <Route path="reports" element={<MasterReports />} />
-            <Route path="profile" element={<MasterProfile />} />
-          </Route>
-          <Route path="/master/qr-display" element={<MasterQRDisplay />} />
+            {/* Master Portal */}
+            <Route
+              path="/master"
+              element={
+                <ProtectedRoute allowedRoles={["master"]}>
+                  <MasterLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="dashboard" element={<MasterDashboard />} />
+              <Route path="attendance" element={<MasterAttendance />} />
+              <Route path="calendar" element={<MasterCalendar />} />
+              <Route path="students" element={<MasterStudents />} />
+              <Route path="reports" element={<MasterReports />} />
+              <Route path="profile" element={<MasterProfile />} />
+            </Route>
+            <Route
+              path="/master/qr-display"
+              element={
+                <ProtectedRoute allowedRoles={["master"]}>
+                  <MasterQRDisplay />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Student Portal */}
-          <Route path="/student" element={<StudentLayout />}>
-            <Route path="signup" element={<StudentSignup />} />
-            <Route path="profile" element={<StudentProfile />} />
-          </Route>
+            {/* Student Portal */}
+            <Route
+              path="/student"
+              element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <StudentLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="dashboard" element={<StudentDashboard />} />
+              <Route path="check-in" element={<StudentCheckIn />} />
+              <Route path="profile" element={<StudentProfile />} />
+              <Route path="signup" element={<StudentSignup />} />
+            </Route>
 
-          {/* Admin Portal */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="masters" element={<AdminMasters />} />
-            <Route path="students" element={<AdminStudents />} />
-            <Route path="system" element={<AdminSystem />} />
-            <Route path="settings" element={<AdminSettings />} />
-          </Route>
+            {/* Admin Portal */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="masters" element={<AdminMasters />} />
+              <Route path="students" element={<AdminStudents />} />
+              <Route path="system" element={<AdminSystem />} />
+              <Route path="settings" element={<AdminSettings />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

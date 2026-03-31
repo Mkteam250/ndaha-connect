@@ -1,40 +1,73 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
 import { Button } from "@/components/ui/button";
-import { todayAttendance as initialAttendance } from "@/lib/mock-data";
+import { api, type AttendanceRecord } from "@/lib/api";
 import { QrCode, CheckCircle2, RefreshCw, Maximize2, MapPin, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-
-function generateQRValue() {
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).substring(2, 8);
-  return `NDAHA-M001-${ts}-${rand}`;
-}
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function MasterAttendance() {
-  const [attendance] = useState(initialAttendance);
-  const [qrValue, setQrValue] = useState(generateQRValue);
+  const { user } = useAuth();
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [qrValue, setQrValue] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const generateQR = useCallback(async () => {
+    try {
+      const res = await api.generateQR();
+      if (res.data?.session) {
+        setQrValue(res.data.session.code);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate QR";
+      toast({ title: msg, variant: "destructive" });
+    }
+  }, [toast]);
+
+  const fetchTodayAttendance = useCallback(async () => {
+    try {
+      const res = await api.getTodayAttendance();
+      setAttendance(res.data?.attendance || []);
+    } catch {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await Promise.all([generateQR(), fetchTodayAttendance()]);
+      setLoading(false);
+    };
+    init();
+  }, [generateQR, fetchTodayAttendance]);
 
   // Auto-regenerate QR every 10 seconds when enabled
   useEffect(() => {
     if (!autoRefresh) return;
     const interval = setInterval(() => {
-      setQrValue(generateQRValue());
+      generateQR();
     }, 10000);
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, generateQR]);
+
+  // Auto-refresh attendance every 10s
+  useEffect(() => {
+    const interval = setInterval(fetchTodayAttendance, 10000);
+    return () => clearInterval(interval);
+  }, [fetchTodayAttendance]);
 
   const handleRegenerate = () => {
-    setQrValue(generateQRValue());
+    generateQR();
     toast({ title: "QR code regenerated!" });
   };
 
@@ -56,9 +89,19 @@ export default function MasterAttendance() {
     }
   };
 
+  const today = new Date().toLocaleDateString("en", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-master border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div>
-      <PageHeader title="Attendance" description="Tuesday, March 31, 2026" />
+      <PageHeader title="Attendance" description={today} />
 
       {/* Location Permission Banner */}
       {!locationEnabled && (
@@ -101,14 +144,18 @@ export default function MasterAttendance() {
             Display this QR code so students can scan it to check in.
           </p>
           <div className="aspect-square max-w-[280px] mx-auto rounded-xl bg-background border border-border flex items-center justify-center p-4 mb-4">
-            <QRCodeSVG
-              value={qrValue}
-              size={240}
-              bgColor="transparent"
-              fgColor="currentColor"
-              className="text-foreground w-full h-full"
-              level="M"
-            />
+            {qrValue ? (
+              <QRCodeSVG
+                value={qrValue}
+                size={240}
+                bgColor="transparent"
+                fgColor="currentColor"
+                className="text-foreground w-full h-full"
+                level="M"
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">Generating...</p>
+            )}
           </div>
           <p className="text-[10px] text-muted-foreground text-center font-mono break-all mb-4">{qrValue}</p>
 
@@ -139,7 +186,7 @@ export default function MasterAttendance() {
             ) : (
               attendance.map((a) => (
                 <motion.div
-                  key={a.studentId}
+                  key={a.id}
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -148,7 +195,7 @@ export default function MasterAttendance() {
                   <AvatarBadge initials={a.avatar} size="sm" accentClass="bg-master-muted text-master" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{a.studentName}</p>
-                    <p className="text-xs text-muted-foreground">{a.time}</p>
+                    <p className="text-xs text-muted-foreground">{a.time} {a.status === "late" && <span className="text-warning">(late)</span>}</p>
                   </div>
                   <CheckCircle2 className="w-4 h-4 text-student shrink-0" />
                 </motion.div>

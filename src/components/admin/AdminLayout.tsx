@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -19,8 +20,14 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, logout } = useAuth();
 
-  const handleLogout = () => {
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "AD";
+
+  const handleLogout = async () => {
+    await logout();
     toast({ title: "Logged out" });
     navigate("/login");
   };
@@ -98,7 +105,7 @@ export default function AdminLayout() {
               <span className="text-xs text-muted-foreground font-medium">Online</span>
             </div>
           </div>
-          <AvatarBadge initials="AD" accentClass="bg-admin-muted text-admin" />
+          <AvatarBadge initials={initials} accentClass="bg-admin-muted text-admin" />
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <Outlet />

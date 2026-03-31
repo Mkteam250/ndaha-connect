@@ -1,54 +1,82 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Pencil, ScanLine, CheckCircle2, Camera, LogOut } from "lucide-react";
+import { Pencil, MapPin, Mail, Phone, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const profile = {
-  firstName: "Amina", lastName: "Uwimana", email: "amina@email.com", phone: "+250788001001",
-  country: "Rwanda", province: "Kigali", district: "Gasabo", sector: "Kimironko", cell: "Bibare",
-  address: "KG 123 St, Kigali", attendedSessions: 21, totalSessions: 22,
-};
+import { api, type Student } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function StudentProfile() {
   const navigate = useNavigate();
-  const [scanning, setScanning] = useState(false);
-  const [checkedIn, setCheckedIn] = useState(false);
-  const [masterName] = useState("Dr. François Bizimungu");
+  const { toast } = useToast();
+  const [student, setStudent] = useState<Student | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleSimulateScan = () => {
-    setScanning(true);
-    setTimeout(() => {
-      setScanning(false);
-      setCheckedIn(true);
-    }, 2000);
-  };
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await api.getMyProfile();
+        setStudent(res.data?.student ?? null);
+      } catch {
+        // Profile may not exist yet
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-student border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!student) {
+    return (
+      <div className="text-center py-12">
+        <GraduationCap className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <p className="text-muted-foreground mb-4">No profile found. Complete your registration first.</p>
+        <Button onClick={() => navigate("/student/signup")} className="gradient-student text-student-foreground border-0 hover:opacity-90">
+          Complete Registration
+        </Button>
+      </div>
+    );
+  }
+
+  const initials = `${student.firstName[0]}${student.lastName[0]}`.toUpperCase();
 
   return (
     <div>
-      <PageHeader title="My Profile" />
+      <PageHeader title="My Profile" description="View and manage your information" />
 
-      {/* Profile card */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-card p-6 mb-6">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-card p-6 max-w-2xl">
         <div className="flex flex-col items-center mb-6">
-          <div className="relative group">
-            <div className="w-24 h-24 rounded-full bg-student-muted text-student flex items-center justify-center text-3xl font-bold">
-              {profile.firstName[0]}{profile.lastName[0]}
-            </div>
-            <div className="absolute inset-0 rounded-full bg-foreground/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-              <span className="text-xs text-background font-medium">Change</span>
-            </div>
+          <div className="w-24 h-24 rounded-full bg-student-muted text-student flex items-center justify-center text-3xl font-bold">
+            {initials}
           </div>
-          <h2 className="text-xl font-semibold text-foreground mt-3">{profile.firstName} {profile.lastName}</h2>
-          <p className="text-sm text-muted-foreground">{profile.email}</p>
+          <h2 className="text-xl font-semibold text-foreground mt-3">{student.firstName} {student.lastName}</h2>
+          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+            <Mail className="w-3.5 h-3.5" /> {student.email}
+          </p>
+          {student.masterId && (
+            <p className="text-xs text-master mt-1 flex items-center gap-1">
+              <GraduationCap className="w-3.5 h-3.5" /> {student.masterId.name}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
           {[
-            ["Phone", profile.phone], ["Country", profile.country],
-            ["Province", profile.province], ["District", profile.district],
-            ["Sector", profile.sector], ["Cell", profile.cell],
+            ["Phone", student.phone || "—"],
+            ["Country", student.country || "—"],
+            ["Province", student.province || "—"],
+            ["District", student.district || "—"],
+            ["Sector", student.sector || "—"],
+            ["Cell", student.cell || "—"],
           ].map(([label, value]) => (
             <div key={label} className="text-sm">
               <span className="text-muted-foreground">{label}</span>
@@ -57,56 +85,25 @@ export default function StudentProfile() {
           ))}
         </div>
 
-        <div className="rounded-lg bg-student-muted p-4 mb-6">
-          <p className="text-sm font-medium text-foreground">Attendance Summary</p>
-          <p className="text-2xl font-bold text-student mt-1">{profile.attendedSessions}/{profile.totalSessions} sessions</p>
-          <div className="w-full h-2 bg-background rounded-full mt-2 overflow-hidden">
-            <div className="h-full rounded-full gradient-student" style={{ width: `${(profile.attendedSessions / profile.totalSessions) * 100}%` }} />
+        {student.address && (
+          <div className="mb-6 text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" /> Address
+            </span>
+            <p className="font-medium text-foreground">{student.address}</p>
           </div>
+        )}
+
+        <div className="rounded-lg bg-student-muted p-4 mb-6">
+          <p className="text-sm font-medium text-foreground">Enrolled Since</p>
+          <p className="text-lg font-bold text-student mt-1">
+            {new Date(student.enrolledDate).toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" })}
+          </p>
         </div>
 
-        <Button onClick={() => navigate("/student/signup")} className="gradient-student text-student-foreground border-0 hover:opacity-90 w-full">
-          <Pencil className="w-4 h-4 mr-1" /> Edit Profile
+        <Button onClick={() => navigate("/student/signup")} variant="outline" className="w-full">
+          <Pencil className="w-4 h-4 mr-2" /> Edit Profile
         </Button>
-      </motion.div>
-
-      {/* QR Scanner Section */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-border bg-card p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center gap-2">
-          <Camera className="w-5 h-5" /> Check In
-        </h3>
-        <p className="text-sm text-muted-foreground mb-4">Scan your master's QR code to mark your attendance.</p>
-
-        {!checkedIn && (
-          <>
-            <div className="aspect-video rounded-lg bg-muted/50 border border-dashed border-border flex flex-col items-center justify-center mb-4">
-              {scanning ? (
-                <>
-                  <ScanLine className="w-12 h-12 text-student animate-pulse mb-2" />
-                  <p className="text-sm text-muted-foreground">Scanning...</p>
-                </>
-              ) : (
-                <>
-                  <ScanLine className="w-12 h-12 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Camera viewport — scan master's QR code</p>
-                  <p className="text-xs text-muted-foreground mt-1">Point your camera at the master's QR code</p>
-                </>
-              )}
-            </div>
-            <Button onClick={handleSimulateScan} disabled={scanning} className="gradient-student text-student-foreground border-0 hover:opacity-90 w-full">
-              <ScanLine className="w-4 h-4 mr-2" /> {scanning ? "Scanning..." : "Simulate Scan"}
-            </Button>
-          </>
-        )}
-
-        {checkedIn && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-lg bg-student-muted p-4 text-center">
-            <CheckCircle2 className="w-10 h-10 text-student mx-auto mb-2" />
-            <p className="text-lg font-semibold text-foreground">Checked In!</p>
-            <p className="text-sm text-muted-foreground mt-1">You checked in with <span className="font-medium text-foreground">{masterName}</span></p>
-            <p className="text-xs text-muted-foreground mt-1">{new Date().toLocaleTimeString()}</p>
-          </motion.div>
-        )}
       </motion.div>
     </div>
   );

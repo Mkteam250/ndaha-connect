@@ -6,9 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { countries, provinces } from "@/lib/mock-data";
 import { Check, ChevronRight, Upload, User, MapPin, FileCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+
+const countries = ["Rwanda", "DRC", "Burundi", "Uganda", "Kenya"];
+const provinces: Record<string, string[]> = {
+  Rwanda: ["Kigali", "Eastern", "Western", "Northern", "Southern"],
+  DRC: ["North Kivu", "South Kivu", "Kinshasa"],
+  Burundi: ["Bujumbura", "Gitega", "Ngozi"],
+  Uganda: ["Central", "Eastern", "Northern", "Western"],
+  Kenya: ["Nairobi", "Mombasa", "Kisumu"],
+};
 
 const steps = [
   { label: "Personal Info", icon: User },
@@ -18,7 +28,9 @@ const steps = [
 
 export default function StudentSignup() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
     country: "", province: "", district: "", sector: "", cell: "", address: "",
@@ -48,6 +60,20 @@ export default function StudentSignup() {
 
   const next = () => { if (validateStep()) setStep((s) => Math.min(s + 1, 2)); };
   const prev = () => setStep((s) => Math.max(s - 1, 0));
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      await api.createStudent(form);
+      toast({ title: "Profile created successfully!" });
+      navigate("/student/dashboard");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create profile";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -94,13 +120,6 @@ export default function StudentSignup() {
                 <Input value={form.phone} onChange={(e) => update("phone", e.target.value)} className={errors.phone ? "border-destructive" : ""} />
                 {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone}</p>}
               </div>
-              <div>
-                <Label>Profile Photo</Label>
-                <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center gap-2 cursor-pointer hover:border-student/50 transition-colors">
-                  <Upload className="w-8 h-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click or drag to upload</p>
-                </div>
-              </div>
             </div>
           )}
 
@@ -140,7 +159,7 @@ export default function StudentSignup() {
             <div className="space-y-4">
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-full bg-student-muted text-student flex items-center justify-center text-2xl font-bold">
-                  {form.firstName[0]}{form.lastName[0]}
+                  {form.firstName[0] || "?"}{form.lastName[0] || "?"}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -173,8 +192,8 @@ export default function StudentSignup() {
                 Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
-              <Button onClick={() => navigate("/student/profile")} className="gradient-student text-student-foreground border-0 hover:opacity-90">
-                Confirm & Register
+              <Button onClick={handleSubmit} disabled={saving} className="gradient-student text-student-foreground border-0 hover:opacity-90">
+                {saving ? "Saving..." : "Confirm & Register"}
               </Button>
             )}
           </div>

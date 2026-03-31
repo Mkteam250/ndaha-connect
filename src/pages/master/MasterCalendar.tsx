@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
-import { calendarData, todayAttendance, students } from "@/lib/mock-data";
+import { api, type AttendanceRecord } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
@@ -18,50 +18,58 @@ function getDaysInMonth(year: number, month: number) {
 }
 
 function getColor(attended: number, total: number) {
-  const pct = (attended / total) * 100;
+  const pct = total > 0 ? (attended / total) * 100 : 0;
   if (pct >= 75) return "bg-student";
   if (pct >= 50) return "bg-warning";
   return "bg-destructive";
 }
 
-// Generate mock day detail data
-function getDayAttendance(dateKey: string) {
-  const data = calendarData[dateKey];
-  if (!data) return [];
-  // Use todayAttendance as a template for the current date, or generate mock for others
-  if (dateKey === "2026-03-31") return todayAttendance;
-  const masterStudents = students.filter(s => s.masterId === "M001");
-  const shuffled = [...masterStudents].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, data.attended).map(s => ({
-    studentId: s.id,
-    studentName: `${s.firstName} ${s.lastName}`,
-    avatar: s.avatar,
-    time: `0${8 + Math.floor(Math.random() * 2)}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
-    date: dateKey,
-  }));
+interface CalendarDayData {
+  attended: number;
+  total: number;
+  records: AttendanceRecord[];
 }
 
 export default function MasterCalendar() {
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(2); // March (0-indexed)
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [calendarData, setCalendarData] = useState<Record<string, CalendarDayData>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await api.getCalendarData(year, month + 1);
+        setCalendarData(res.data?.calendarData || {});
+      } catch {
+        setCalendarData({});
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [year, month]);
 
   const days = getDaysInMonth(year, month);
 
   const goNext = () => {
     if (month === 11) { setMonth(0); setYear(y => y + 1); }
     else setMonth(m => m + 1);
+    setSelectedDay(null);
   };
 
   const goPrev = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1); }
     else setMonth(m => m - 1);
+    setSelectedDay(null);
   };
 
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
 
-  const dayAttendance = selectedDay ? getDayAttendance(selectedDay) : [];
   const dayData = selectedDay ? calendarData[selectedDay] : null;
 
   return (
@@ -76,39 +84,45 @@ export default function MasterCalendar() {
             <button onClick={goNext} className="p-2 rounded-lg hover:bg-accent text-muted-foreground"><ChevronRight className="w-4 h-4" /></button>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {daysOfWeek.map((d) => (
-              <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
-            ))}
-            {days.map((date, i) => {
-              if (!date) return <div key={`empty-${i}`} />;
-              const key = date.toISOString().split("T")[0];
-              const data = calendarData[key];
-              const isToday = isCurrentMonth && date.getDate() === today.getDate();
-              const isSelected = selectedDay === key;
-              return (
-                <motion.div
-                  key={key}
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => setSelectedDay(key)}
-                  className={`aspect-square rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                    isSelected ? "border-master bg-master/10 ring-2 ring-master/30" :
-                    isToday ? "border-master bg-master-muted" : "border-border hover:bg-accent/50"
-                  }`}
-                >
-                  <span className={`text-sm font-medium ${isToday ? "text-master" : "text-foreground"}`}>{date.getDate()}</span>
-                  {data && (
-                    <div className={`w-2 h-2 rounded-full mt-1 ${getColor(data.attended, data.total)}`} />
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center h-48">
+              <div className="w-8 h-8 border-2 border-master border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-7 gap-1">
+              {daysOfWeek.map((d) => (
+                <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
+              ))}
+              {days.map((date, i) => {
+                if (!date) return <div key={`empty-${i}`} />;
+                const key = date.toISOString().split("T")[0];
+                const data = calendarData[key];
+                const isToday = isCurrentMonth && date.getDate() === today.getDate();
+                const isSelected = selectedDay === key;
+                return (
+                  <motion.div
+                    key={key}
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => setSelectedDay(key)}
+                    className={`aspect-square rounded-lg border flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                      isSelected ? "border-master bg-master/10 ring-2 ring-master/30" :
+                      isToday ? "border-master bg-master-muted" : "border-border hover:bg-accent/50"
+                    }`}
+                  >
+                    <span className={`text-sm font-medium ${isToday ? "text-master" : "text-foreground"}`}>{date.getDate()}</span>
+                    {data && (
+                      <div className={`w-2 h-2 rounded-full mt-1 ${getColor(data.attended, data.total)}`} />
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
             {[
               { color: "bg-student", label: ">75% attendance" },
-              { color: "bg-warning", label: "50–75%" },
+              { color: "bg-warning", label: "50-75%" },
               { color: "bg-destructive", label: "<50%" },
             ].map((l) => (
               <div key={l.label} className="flex items-center gap-1.5">
@@ -136,8 +150,8 @@ export default function MasterCalendar() {
                     </div>
                     <p className="text-xs font-medium text-muted-foreground mb-2">Students present</p>
                     <div className="space-y-2 max-h-[300px] overflow-auto">
-                      {dayAttendance.map(a => (
-                        <div key={a.studentId} className="flex items-center gap-3 p-2 rounded-lg border border-border">
+                      {dayData.records.map(a => (
+                        <div key={a.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
                           <AvatarBadge initials={a.avatar} size="sm" accentClass="bg-master-muted text-master" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">{a.studentName}</p>

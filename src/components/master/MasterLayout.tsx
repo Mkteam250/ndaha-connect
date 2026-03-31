@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/master/dashboard" },
@@ -20,8 +21,14 @@ export default function MasterLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, logout } = useAuth();
 
-  const handleLogout = () => {
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "M";
+
+  const handleLogout = async () => {
+    await logout();
     toast({ title: "Logged out" });
     navigate("/login");
   };
@@ -99,7 +106,7 @@ export default function MasterLayout() {
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-master" />
             </button>
-            <AvatarBadge initials="FB" accentClass="bg-master-muted text-master" />
+            <AvatarBadge initials={initials} accentClass="bg-master-muted text-master" />
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-6">

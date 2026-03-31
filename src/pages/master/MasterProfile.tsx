@@ -4,19 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
-import { Camera, Save } from "lucide-react";
+import { Save, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function MasterProfile() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState({
-    name: "Dr. François Bizimungu",
-    email: "francois@ndaha.com",
-    phone: "+250788000001",
-    bio: "Mathematics instructor with 10+ years experience.",
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: "",
+    bio: "",
   });
   const [form, setForm] = useState(profile);
+
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "M";
 
   const handleSave = () => {
     setProfile(form);
@@ -32,16 +38,14 @@ export default function MasterProfile() {
         <div className="flex flex-col items-center mb-6">
           <div className="relative group">
             <div className="w-24 h-24 rounded-full bg-master-muted text-master flex items-center justify-center text-3xl font-bold">
-              FB
-            </div>
-            <div className="absolute inset-0 rounded-full bg-foreground/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-              <Camera className="w-5 h-5 text-background" />
+              {initials}
             </div>
           </div>
           {!editing && (
             <>
               <h2 className="text-xl font-semibold text-foreground mt-3">{profile.name}</h2>
               <p className="text-sm text-muted-foreground">{profile.email}</p>
+              <span className="text-xs bg-master-muted text-master px-2 py-0.5 rounded-full font-medium mt-1">Master</span>
             </>
           )}
         </div>
@@ -74,8 +78,9 @@ export default function MasterProfile() {
         ) : (
           <div className="space-y-4">
             {[
-              ["Phone", profile.phone],
-              ["Bio", profile.bio],
+              ["Phone", profile.phone || "Not set"],
+              ["Bio", profile.bio || "Not set"],
+              ["Student Limit", `${user?.studentLimit || 5} students`],
             ].map(([label, value]) => (
               <div key={label} className="text-sm">
                 <span className="text-muted-foreground">{label}</span>
@@ -83,7 +88,7 @@ export default function MasterProfile() {
               </div>
             ))}
             <Button onClick={() => setEditing(true)} variant="outline" className="w-full mt-4">
-              Edit Profile
+              <User className="w-4 h-4 mr-2" /> Edit Profile
             </Button>
           </div>
         )}
