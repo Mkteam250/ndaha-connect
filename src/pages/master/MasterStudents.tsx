@@ -3,30 +3,85 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { students as allStudents } from "@/lib/mock-data";
-import { Search, Eye, Pencil, Trash2, Plus } from "lucide-react";
+import { Search, Eye, Pencil, Trash2, Plus, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useToast } from "@/hooks/use-toast";
 
-const masterStudents = allStudents.filter((s) => s.masterId === "M001");
+interface StudentData {
+  id: string; firstName: string; lastName: string; email: string; phone: string;
+  country: string; province: string; avatar: string; enrolledDate: string;
+  attendanceRate: number; masterId: string;
+}
+
 const LIMIT = 5;
 
 export default function MasterStudents() {
+  const { toast } = useToast();
+  const [studentsList, setStudentsList] = useState<StudentData[]>(
+    allStudents.filter((s) => s.masterId === "M001")
+  );
   const [search, setSearch] = useState("");
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
-  const [viewStudent, setViewStudent] = useState<typeof masterStudents[0] | null>(null);
+  const [viewStudent, setViewStudent] = useState<StudentData | null>(null);
+  const [editStudent, setEditStudent] = useState<StudentData | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
+  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", email: "", phone: "", country: "", province: "" });
 
-  const filtered = masterStudents.filter((s) =>
+  const filtered = studentsList.filter((s) =>
     `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(search.toLowerCase())
   );
+  const atLimit = studentsList.length >= LIMIT;
 
-  const atLimit = masterStudents.length >= LIMIT;
+  const handleRemove = () => {
+    if (removeTarget) {
+      setStudentsList(prev => prev.filter(s => s.id !== removeTarget));
+      setRemoveTarget(null);
+      toast({ title: "Student removed" });
+    }
+  };
+
+  const openEdit = (s: StudentData) => {
+    setEditStudent(s);
+    setEditForm({ firstName: s.firstName, lastName: s.lastName, email: s.email, phone: s.phone, country: s.country, province: s.province });
+  };
+
+  const openAdd = () => {
+    setAddingNew(true);
+    setEditStudent(null);
+    setEditForm({ firstName: "", lastName: "", email: "", phone: "", country: "", province: "" });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editForm.firstName || !editForm.lastName || !editForm.email) return;
+    if (editStudent) {
+      setStudentsList(prev => prev.map(s => s.id === editStudent.id ? { ...s, ...editForm, avatar: `${editForm.firstName[0]}${editForm.lastName[0]}` } : s));
+      toast({ title: "Student updated" });
+    } else {
+      const newStudent: StudentData = {
+        id: `S${Date.now()}`,
+        ...editForm,
+        avatar: `${editForm.firstName[0]}${editForm.lastName[0]}`,
+        enrolledDate: new Date().toISOString().split("T")[0],
+        attendanceRate: 0,
+        masterId: "M001",
+      };
+      setStudentsList(prev => [...prev, newStudent]);
+      toast({ title: "Student added" });
+    }
+    setEditStudent(null);
+    setAddingNew(false);
+  };
+
+  const showEditPanel = !!editStudent || addingNew;
 
   return (
     <div>
       <PageHeader title="Students" description="Manage your enrolled students">
-        <Button disabled={atLimit} className="gradient-master text-master-foreground border-0 hover:opacity-90" title={atLimit ? "Contact admin to increase limit" : ""}>
+        <Button disabled={atLimit} onClick={openAdd} className="gradient-master text-master-foreground border-0 hover:opacity-90" title={atLimit ? "Contact admin to increase limit" : ""}>
           <Plus className="w-4 h-4 mr-1" /> Add Student
         </Button>
       </PageHeader>
@@ -34,9 +89,9 @@ export default function MasterStudents() {
       {/* Limit banner */}
       <div className="mb-4 rounded-lg border border-border bg-card p-3 flex items-center gap-3">
         <div className="flex-1">
-          <p className="text-sm text-foreground font-medium">{masterStudents.length}/{LIMIT} students (limit {atLimit ? "reached" : ""})</p>
+          <p className="text-sm text-foreground font-medium">{studentsList.length}/{LIMIT} students (limit {atLimit ? "reached" : ""})</p>
           <div className="w-full h-2 bg-muted rounded-full mt-1 overflow-hidden">
-            <div className={`h-full rounded-full ${atLimit ? "bg-destructive" : "gradient-master"}`} style={{ width: `${(masterStudents.length / LIMIT) * 100}%` }} />
+            <div className={`h-full rounded-full ${atLimit ? "bg-destructive" : "gradient-master"}`} style={{ width: `${(studentsList.length / LIMIT) * 100}%` }} />
           </div>
         </div>
         {atLimit && <p className="text-xs text-muted-foreground">Contact admin to increase your student limit.</p>}
@@ -88,22 +143,24 @@ export default function MasterStudents() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => setViewStudent(s)} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Eye className="w-4 h-4" /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => setRemoveTarget(s.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </motion.tr>
               ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No students found.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* View Student */}
       <Sheet open={!!viewStudent} onOpenChange={() => setViewStudent(null)}>
         <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Student Profile</SheetTitle>
-          </SheetHeader>
+          <SheetHeader><SheetTitle>Student Profile</SheetTitle></SheetHeader>
           {viewStudent && (
             <div className="mt-6 space-y-4">
               <div className="flex justify-center">
@@ -115,10 +172,8 @@ export default function MasterStudents() {
               </div>
               <div className="space-y-3 pt-4 border-t border-border">
                 {[
-                  ["Phone", viewStudent.phone],
-                  ["Country", viewStudent.country],
-                  ["Province", viewStudent.province],
-                  ["Enrolled", viewStudent.enrolledDate],
+                  ["Phone", viewStudent.phone], ["Country", viewStudent.country],
+                  ["Province", viewStudent.province], ["Enrolled", viewStudent.enrolledDate],
                   ["Attendance", `${viewStudent.attendanceRate}%`],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between text-sm">
@@ -132,12 +187,30 @@ export default function MasterStudents() {
         </SheetContent>
       </Sheet>
 
+      {/* Edit/Add Student */}
+      <Sheet open={showEditPanel} onOpenChange={() => { setEditStudent(null); setAddingNew(false); }}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>{editStudent ? "Edit Student" : "Add Student"}</SheetTitle></SheetHeader>
+          <div className="mt-6 space-y-4">
+            <div><Label>First Name</Label><Input value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} /></div>
+            <div><Label>Last Name</Label><Input value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} /></div>
+            <div><Label>Email</Label><Input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></div>
+            <div><Label>Phone</Label><Input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+            <div><Label>Country</Label><Input value={editForm.country} onChange={e => setEditForm({ ...editForm, country: e.target.value })} /></div>
+            <div><Label>Province</Label><Input value={editForm.province} onChange={e => setEditForm({ ...editForm, province: e.target.value })} /></div>
+            <Button onClick={handleSaveEdit} className="gradient-master text-master-foreground border-0 hover:opacity-90 w-full">
+              {editStudent ? "Save Changes" : "Add Student"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <ConfirmModal
         open={!!removeTarget}
         onOpenChange={() => setRemoveTarget(null)}
         title="Remove Student"
         description="This will remove the student from your enrollment. This action cannot be undone."
-        onConfirm={() => setRemoveTarget(null)}
+        onConfirm={handleRemove}
         confirmLabel="Remove"
         destructive
       />

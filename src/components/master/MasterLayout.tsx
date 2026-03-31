@@ -1,5 +1,5 @@
 import { NavLink as RouterNavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Calendar, Users, FileText, Settings, Bell, ChevronLeft, Menu } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Calendar, Users, FileText, User, Bell, ChevronLeft, Menu } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
@@ -10,7 +10,7 @@ const navItems = [
   { label: "Calendar", icon: Calendar, path: "/master/calendar" },
   { label: "Students", icon: Users, path: "/master/students" },
   { label: "Reports", icon: FileText, path: "/master/reports" },
-  { label: "Settings", icon: Settings, path: "/master/settings" },
+  { label: "Profile", icon: User, path: "/master/profile" },
 ];
 
 export default function MasterLayout() {

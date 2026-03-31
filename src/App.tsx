@@ -17,7 +17,7 @@ import MasterAttendance from "./pages/master/MasterAttendance";
 import MasterCalendar from "./pages/master/MasterCalendar";
 import MasterStudents from "./pages/master/MasterStudents";
 import MasterReports from "./pages/master/MasterReports";
-import MasterSettings from "./pages/master/MasterSettings";
+import MasterProfile from "./pages/master/MasterProfile";
 
 // Student pages
 import StudentSignup from "./pages/student/StudentSignup";
@@ -48,7 +48,7 @@ const App = () => (
             <Route path="calendar" element={<MasterCalendar />} />
             <Route path="students" element={<MasterStudents />} />
             <Route path="reports" element={<MasterReports />} />
-            <Route path="settings" element={<MasterSettings />} />
+            <Route path="profile" element={<MasterProfile />} />
           </Route>
 
           {/* Student Portal */}
