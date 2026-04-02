@@ -11,7 +11,7 @@ exports.generateQR = async (req, res, next) => {
 
     const code = `NDAHA-${req.user._id.toString().slice(-6)}-${Date.now().toString(36)}-${crypto.randomBytes(4).toString("hex")}`;
 
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 30 * 1000); // 30 seconds - single use QR
 
     const session = await QRSession.create({
       masterId: req.user._id,
@@ -85,6 +85,37 @@ exports.deactivateSession = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "QR session deactivated",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Reset QR for a specific student - allows them to scan again today
+exports.resetStudentQR = async (req, res, next) => {
+  try {
+    const { studentId } = req.params;
+    const masterId = req.user._id;
+    const today = new Date().toISOString().split("T")[0];
+
+    const Attendance = require("../models/Attendance");
+    const Student = require("../models/Student");
+
+    // Find the student document
+    const student = await Student.findOne({ userId: studentId, masterId });
+    if (!student) {
+      // Try finding by student _id directly
+      const deleted = await Attendance.findOneAndDelete({ studentId, masterId, date: today });
+      if (!deleted) {
+        return next(new AppError("No attendance record found for this student today", 404));
+      }
+    } else {
+      await Attendance.findOneAndDelete({ studentId: student._id, masterId, date: today });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Attendance cleared. Student can check in again.",
     });
   } catch (error) {
     next(error);

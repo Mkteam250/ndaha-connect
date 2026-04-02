@@ -60,8 +60,9 @@ export default function MasterAttendance() {
 
   // QR state
   const [qrValue, setQrValue] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [lastCheckInCount, setLastCheckInCount] = useState(0);
 
   // Location state
   const [locationEnforced, setLocationEnforced] = useState(false);
@@ -150,23 +151,27 @@ export default function MasterAttendance() {
     init();
   }, [generateQR, fetchTodayAttendance, fetchMyStudents]);
 
-  // Auto-regenerate QR every 10 seconds when enabled
+  // Auto-regenerate QR every 30 seconds (matches QR expiry) - always on
   useEffect(() => {
-    if (!autoRefresh) return;
     const interval = setInterval(() => {
       generateQR();
-    }, 10000);
+    }, 30000);
     return () => clearInterval(interval);
-  }, [autoRefresh, generateQR]);
+  }, [generateQR]);
 
-  // Auto-refresh attendance every 10s
+  // Auto-refresh attendance every 30s and regenerate QR when new check-in detected
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchTodayAttendance();
-      fetchMyStudents();
-    }, 10000);
+    const interval = setInterval(async () => {
+      const prevCount = attendance.length;
+      await fetchTodayAttendance();
+      await fetchMyStudents();
+      // If new check-in detected, regenerate QR immediately
+      if (attendance.length > prevCount) {
+        generateQR();
+      }
+    }, 30000);
     return () => clearInterval(interval);
-  }, [fetchTodayAttendance, fetchMyStudents]);
+  }, [fetchTodayAttendance, fetchMyStudents, generateQR, attendance.length]);
 
   // Fetch all students for add dialog
   const fetchAllStudents = useCallback(async () => {
@@ -327,6 +332,22 @@ export default function MasterAttendance() {
     }
   };
 
+  const handleResetStudentQR = async (studentId: string, studentName: string) => {
+    setDeletingAttendance(studentId);
+    try {
+      await api.resetStudentQR(studentId);
+      toast({ title: `${studentName} can now scan again` });
+      generateQR();
+      fetchTodayAttendance();
+      fetchMyStudents();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reset";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setDeletingAttendance(null);
+    }
+  };
+
   const presentCount = myStudents.filter((s) => s.todayStatus?.status === "present").length;
   const lateCount = myStudents.filter((s) => s.todayStatus?.status === "late").length;
   const absentCount = myStudents.filter((s) => s.todayStatus?.status === "absent").length;
@@ -460,7 +481,7 @@ export default function MasterAttendance() {
                 <QrCode className="w-4 h-4" /> Your QR Code
               </h3>
               <p className="text-xs text-muted-foreground mb-4">
-                Display this QR code so students can scan it to check in.
+                QR code changes automatically every 30 seconds. Each code is single-use - once a student scans it, a new one generates.
               </p>
               <div className="aspect-square max-w-[280px] mx-auto rounded-xl bg-background border border-border flex items-center justify-center p-4 mb-4">
                 {qrValue ? (
@@ -480,20 +501,16 @@ export default function MasterAttendance() {
 
               <div className="flex gap-2 mb-2">
                 <Button onClick={handleRegenerate} variant="outline" className="flex-1">
-                  <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
+                  <RefreshCw className="w-4 h-4 mr-2" /> New Code Now
                 </Button>
                 <Button onClick={() => navigate("/master/qr-display")} variant="outline" className="flex-1">
                   <Maximize2 className="w-4 h-4 mr-2" /> Full Screen
                 </Button>
               </div>
-              <Button
-                onClick={() => { setAutoRefresh(!autoRefresh); toast({ title: autoRefresh ? "Auto-refresh stopped" : "QR auto-refreshes every 10s" }); }}
-                variant={autoRefresh ? "default" : "outline"}
-                className={`w-full ${autoRefresh ? "gradient-master text-master-foreground border-0" : ""}`}
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${autoRefresh ? "animate-spin" : ""}`} />
-                {autoRefresh ? "Auto-Refresh ON" : "Enable Auto-Refresh"}
-              </Button>
+              <div className="w-full rounded-lg bg-student/10 border border-student/20 p-2 flex items-center justify-center gap-2 text-xs text-student">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                Auto-refreshing every 30 seconds - always on
+              </div>
             </motion.div>
 
             {/* Today's checklist (QR scans) */}

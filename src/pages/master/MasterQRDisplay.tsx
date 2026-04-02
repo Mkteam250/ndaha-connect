@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function MasterQRDisplay() {
   const [qrValue, setQrValue] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -27,13 +26,13 @@ export default function MasterQRDisplay() {
     generateQR();
   }, [generateQR]);
 
+  // Auto-regenerate every 30 seconds - always on, no toggle
   useEffect(() => {
-    if (!autoRefresh) return;
     const interval = setInterval(() => {
       generateQR();
-    }, 10000);
+    }, 30000);
     return () => clearInterval(interval);
-  }, [autoRefresh, generateQR]);
+  }, [generateQR]);
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center p-6">
@@ -41,24 +40,13 @@ export default function MasterQRDisplay() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/master/attendance")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateQR}
-          >
-            <RefreshCw className="w-4 h-4 mr-1" /> New Code
-          </Button>
-          <Button
-            variant={autoRefresh ? "default" : "outline"}
-            size="sm"
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={autoRefresh ? "gradient-master text-master-foreground border-0" : ""}
-          >
-            <RefreshCw className={`w-4 h-4 mr-1 ${autoRefresh ? "animate-spin" : ""}`} />
-            {autoRefresh ? "Auto ON" : "Auto OFF"}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={generateQR}
+        >
+          <RefreshCw className="w-4 h-4 mr-1" /> New Code Now
+        </Button>
       </div>
 
       <div className="bg-white rounded-2xl p-8 shadow-xl">
@@ -78,13 +66,14 @@ export default function MasterQRDisplay() {
       </div>
 
       <p className="text-sm text-muted-foreground mt-6 text-center">
-        Show this QR code to your students so they can check in
+        Show this QR code to your students. It changes every 30 seconds.
       </p>
       <p className="text-[10px] text-muted-foreground font-mono mt-2 break-all max-w-md text-center">{qrValue}</p>
 
-      {autoRefresh && (
-        <p className="text-xs text-master mt-3 animate-pulse">Auto-refreshing every 10 seconds</p>
-      )}
+      <div className="mt-3 flex items-center gap-2 text-xs text-student">
+        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+        <span>Auto-refreshing every 30 seconds - always on</span>
+      </div>
     </div>
   );
 }

@@ -403,6 +403,10 @@ export const api = {
     request("/qr/deactivate", {
       method: "POST",
     }),
+  resetStudentQR: (studentId: string) =>
+    request(`/qr/reset/${studentId}`, {
+      method: "POST",
+    }),
 
   // Dashboard
   getMasterDashboard: () =>

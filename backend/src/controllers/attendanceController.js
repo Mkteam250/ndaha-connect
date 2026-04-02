@@ -85,11 +85,12 @@ exports.checkIn = async (req, res, next) => {
 
     // Location verification
     const master = await User.findById(session.masterId);
+    let distance = null;
     if (master.locationEnabled && master.locationLat && master.locationLng) {
       if (!latitude || !longitude) {
         return next(new AppError("Location is required. Please enable location services.", 400));
       }
-      const distance = getDistance(master.locationLat, master.locationLng, latitude, longitude);
+      distance = getDistance(master.locationLat, master.locationLng, latitude, longitude);
       if (distance > 200) {
         return next(new AppError(`You are too far from the master (${Math.round(distance)}m away). You must be within 200m to check in.`, 400));
       }
@@ -135,7 +136,7 @@ exports.checkIn = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: `Checked in as ${status}!`,
-      data: { attendance },
+      data: { attendance: { ...attendance.toObject(), distance: distance !== null ? Math.round(distance) : null } },
     });
   } catch (error) {
     next(error);

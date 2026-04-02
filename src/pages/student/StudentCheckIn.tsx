@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { CheckCircle2, ScanLine, AlertCircle, MapPin, Loader2 } from "lucide-react";
+import { CheckCircle2, ScanLine, AlertCircle, MapPin, Loader2, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -12,9 +12,10 @@ export default function StudentCheckIn() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [checkedIn, setCheckedIn] = useState(false);
+  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [checkInData, setCheckInData] = useState<{ time: string; date: string; status: string } | null>(null);
+  const [checkInData, setCheckInData] = useState<{ time: string; date: string; status: string; distance: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const getLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
@@ -58,13 +59,19 @@ export default function StudentCheckIn() {
           time: res.data.attendance.time,
           date: res.data.attendance.date,
           status: res.data.attendance.status,
+          distance: (res.data.attendance as { distance?: number | null }).distance ?? null,
         });
         toast({ title: "Successfully checked in!" });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Check-in failed";
-      setError(msg);
-      toast({ title: msg, variant: "destructive" });
+      if (msg.toLowerCase().includes("already checked in")) {
+        setAlreadyCheckedIn(true);
+        toast({ title: "You already checked in today" });
+      } else {
+        setError(msg);
+        toast({ title: msg, variant: "destructive" });
+      }
     } finally {
       setProcessing(false);
       setGettingLocation(false);
@@ -75,7 +82,22 @@ export default function StudentCheckIn() {
     <div>
       <PageHeader title="Check In" description="Scan your master's QR code to mark attendance" />
 
-      {!checkedIn ? (
+      {alreadyCheckedIn ? (
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-xl border border-border bg-card p-6">
+          <div className="text-center py-6">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", damping: 10 }}>
+              <Info className="w-16 h-16 text-master mx-auto mb-4" />
+            </motion.div>
+            <h3 className="text-2xl font-bold text-foreground mb-2">Already Checked In</h3>
+            <p className="text-sm text-muted-foreground mb-6">You have already checked in today. You cannot check in again.</p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => navigate("/student/dashboard")} className="gradient-student text-student-foreground border-0 hover:opacity-90">
+                Go to Dashboard
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      ) : !checkedIn ? (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <ScanLine className="w-5 h-5 text-student" />
@@ -135,6 +157,14 @@ export default function StudentCheckIn() {
                   {checkInData?.status}
                 </span>
               </div>
+              {checkInData?.distance !== null && checkInData?.distance !== undefined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Distance</span>
+                  <span className="font-medium text-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {checkInData.distance}m from master
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 justify-center mt-6">
