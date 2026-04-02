@@ -86,6 +86,22 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "suspended"],
       default: "active",
     },
+    locationEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    locationLat: {
+      type: Number,
+      default: null,
+    },
+    locationLng: {
+      type: Number,
+      default: null,
+    },
+    locationUpdatedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

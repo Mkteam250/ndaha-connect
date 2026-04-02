@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { CheckCircle2, ScanLine, AlertCircle } from "lucide-react";
+import { CheckCircle2, ScanLine, AlertCircle, MapPin, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -13,14 +13,45 @@ export default function StudentCheckIn() {
   const { toast } = useToast();
   const [checkedIn, setCheckedIn] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [checkInData, setCheckInData] = useState<{ time: string; date: string; status: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const getLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        () => {
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+  };
 
   const handleScanSuccess = async (qrCode: string) => {
     setProcessing(true);
     setError(null);
     try {
-      const res = await api.checkIn({ qrCode });
+      // Try to get location (may be required by master)
+      setGettingLocation(true);
+      const location = await getLocation();
+      setGettingLocation(false);
+
+      const res = await api.checkIn({
+        qrCode,
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+      });
       if (res.data?.attendance) {
         setCheckedIn(true);
         setCheckInData({
@@ -36,6 +67,7 @@ export default function StudentCheckIn() {
       toast({ title: msg, variant: "destructive" });
     } finally {
       setProcessing(false);
+      setGettingLocation(false);
     }
   };
 
@@ -56,7 +88,14 @@ export default function StudentCheckIn() {
           {processing ? (
             <div className="text-center py-12">
               <div className="w-12 h-12 border-2 border-student border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-sm font-medium text-foreground">Processing check-in...</p>
+              <p className="text-sm font-medium text-foreground">
+                {gettingLocation ? "Getting your location..." : "Processing check-in..."}
+              </p>
+              {gettingLocation && (
+                <p className="text-xs text-muted-foreground mt-2 flex items-center justify-center gap-1">
+                  <MapPin className="w-3 h-3" /> Location required for verification
+                </p>
+              )}
             </div>
           ) : (
             <QRScanner onScanSuccess={handleScanSuccess} isProcessing={processing} />

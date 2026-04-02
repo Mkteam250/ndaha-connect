@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Eye,
   Mail,
+  Shield,
+  ShieldOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -57,9 +59,11 @@ export default function MasterAttendance() {
   // QR state
   const [qrValue, setQrValue] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [locationEnabled, setLocationEnabled] = useState(false);
-  const [locationDenied, setLocationDenied] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Location state
+  const [locationEnforced, setLocationEnforced] = useState(false);
+  const [togglingLocation, setTogglingLocation] = useState(false);
 
   // Today's check-ins (from QR scans)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
@@ -122,6 +126,11 @@ export default function MasterAttendance() {
     const init = async () => {
       setLoading(true);
       await Promise.all([generateQR(), fetchTodayAttendance(), fetchMyStudents()]);
+      // Load location settings
+      try {
+        const locRes = await api.getMasterLocation();
+        setLocationEnforced(locRes.data?.locationEnabled || false);
+      } catch { /* silent */ }
       setLoading(false);
     };
     init();
@@ -179,21 +188,50 @@ export default function MasterAttendance() {
     toast({ title: "QR code regenerated!" });
   };
 
-  const handleEnableLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => {
-          setLocationEnabled(true);
-          setLocationDenied(false);
-          toast({ title: "Location enabled successfully!" });
-        },
-        () => {
-          setLocationDenied(true);
-          setLocationEnabled(false);
+  const handleToggleLocationEnforcement = async () => {
+    setTogglingLocation(true);
+    try {
+      if (!locationEnforced) {
+        // Enable: get current location and save it
+        if (!navigator.geolocation) {
+          toast({ title: "Geolocation is not supported by your browser", variant: "destructive" });
+          setTogglingLocation(false);
+          return;
         }
-      );
-    } else {
-      setLocationDenied(true);
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const res = await api.updateMasterLocation({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                locationEnabled: true,
+              });
+              setLocationEnforced(res.data?.locationEnabled || false);
+              toast({ title: "Location check enabled! Students must be near you to check in." });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : "Failed to enable location";
+              toast({ title: msg, variant: "destructive" });
+            } finally {
+              setTogglingLocation(false);
+            }
+          },
+          () => {
+            toast({ title: "Location permission denied. Please allow location access.", variant: "destructive" });
+            setTogglingLocation(false);
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else {
+        // Disable
+        const res = await api.updateMasterLocation({ locationEnabled: false });
+        setLocationEnforced(res.data?.locationEnabled || false);
+        toast({ title: "Location check disabled" });
+        setTogglingLocation(false);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update location";
+      toast({ title: msg, variant: "destructive" });
+      setTogglingLocation(false);
     }
   };
 
@@ -274,36 +312,44 @@ export default function MasterAttendance() {
         </Button>
       </PageHeader>
 
-      {/* Location Permission Banner */}
-      {!locationEnabled && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border bg-card p-4 mb-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-master-muted flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-master" />
+      {/* Location Enforcement Toggle */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className={`rounded-xl border p-4 mb-6 ${locationEnforced ? "border-student/30 bg-student/5" : "border-border bg-card"}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${locationEnforced ? "bg-student-muted" : "bg-muted"}`}>
+              {locationEnforced ? <Shield className="w-5 h-5 text-student" /> : <ShieldOff className="w-5 h-5 text-muted-foreground" />}
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Enable Location</p>
-              <p className="text-xs text-muted-foreground">Location must be enabled so students within range can check in.</p>
+              <p className="text-sm font-semibold text-foreground">
+                {locationEnforced ? "Location Check Enabled" : "Location Check Disabled"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {locationEnforced
+                  ? "Students must be within 200m of you to check in via QR."
+                  : "Enable to force students to be near you when scanning QR."}
+              </p>
             </div>
           </div>
-          {locationDenied && (
-            <div className="flex items-center gap-2 mb-3 text-destructive">
-              <XCircle className="w-4 h-4" />
-              <p className="text-xs">Location denied. Please allow location in your browser settings.</p>
-            </div>
-          )}
-          <Button onClick={handleEnableLocation} className="gradient-master text-master-foreground border-0 hover:opacity-90 w-full">
-            <MapPin className="w-4 h-4 mr-2" /> Enable Location
+          <Button
+            onClick={handleToggleLocationEnforcement}
+            disabled={togglingLocation}
+            variant={locationEnforced ? "outline" : "default"}
+            className={locationEnforced ? "border-destructive/30 text-destructive hover:bg-destructive/10" : "gradient-master text-master-foreground border-0 hover:opacity-90"}
+          >
+            {togglingLocation ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : locationEnforced ? (
+              <>
+                <ShieldOff className="w-4 h-4 mr-2" /> Disable
+              </>
+            ) : (
+              <>
+                <Shield className="w-4 h-4 mr-2" /> Enable
+              </>
+            )}
           </Button>
-        </motion.div>
-      )}
-
-      {locationEnabled && (
-        <div className="flex items-center gap-2 mb-4 text-master">
-          <CheckCircle2 className="w-4 h-4" />
-          <p className="text-xs font-medium">Location enabled — students nearby can check in</p>
         </div>
-      )}
+      </motion.div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">

@@ -348,7 +348,7 @@ export const api = {
     }),
 
   // Attendance
-  checkIn: (body: { qrCode: string }) =>
+  checkIn: (body: { qrCode: string; latitude?: number; longitude?: number }) =>
     request<{ attendance: AttendanceRecord }>("/attendance/check-in", {
       method: "POST",
       body: JSON.stringify(body),
@@ -374,6 +374,13 @@ export const api = {
     }),
   getStudentsAttendanceStatus: () =>
     request<{ students: Array<{ id: string; name: string; email: string; avatar: string | null; initials: string; country: string | null; province: string | null; todayStatus: { status: string; time: string; id: string } | null }> }>("/attendance/students-status"),
+  getMasterLocation: () =>
+    request<{ locationEnabled: boolean; locationLat: number | null; locationLng: number | null; locationUpdatedAt: string | null }>("/attendance/location"),
+  updateMasterLocation: (body: { latitude?: number; longitude?: number; locationEnabled?: boolean }) =>
+    request<{ locationEnabled: boolean; locationLat: number | null; locationLng: number | null }>("/attendance/location", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 
   // QR
   generateQR: () =>

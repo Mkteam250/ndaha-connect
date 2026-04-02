@@ -7,10 +7,13 @@ exports.getMasterDashboard = async (req, res, next) => {
     const masterId = req.user._id;
     const today = new Date().toISOString().split("T")[0];
 
-    const totalStudents = await Student.countDocuments({ masterId, status: "active" });
+    // Get master with registered students
+    const master = await User.findById(masterId);
+    const totalStudents = master?.registeredStudents?.length || 0;
+
     const todayRecords = await Attendance.find({ masterId, date: today });
-    const presentToday = todayRecords.length;
-    const absentToday = totalStudents - presentToday;
+    const presentToday = todayRecords.filter((r) => r.status === "present" || r.status === "late").length;
+    const absentToday = todayRecords.filter((r) => r.status === "absent").length;
     const rate = totalStudents > 0 ? Math.round((presentToday / totalStudents) * 100) : 0;
 
     // Last 30 days trend
@@ -43,9 +46,15 @@ exports.getMasterDashboard = async (req, res, next) => {
       });
     }
 
-    // Top students by attendance
-    const students = await Student.find({ masterId, status: "active" }).populate("userId", "avatar");
+    // Top students by attendance - use registered students from User model
+    const registeredStudentIds = master?.registeredStudents || [];
+    const registeredUsers = await User.find({ _id: { $in: registeredStudentIds } }).select("name avatar initials");
     const allAttendance = await Attendance.find({ masterId });
+
+    // Build a map of userId -> student document IDs to match attendance records
+    const students = await Student.find({ userId: { $in: registeredStudentIds } });
+    const userIdToStudentId = {};
+    students.forEach((s) => { userIdToStudentId[s.userId.toString()] = s._id.toString(); });
 
     const studentAttendance = {};
     allAttendance.forEach((r) => {
@@ -54,52 +63,39 @@ exports.getMasterDashboard = async (req, res, next) => {
       studentAttendance[sid]++;
     });
 
-    // Count unique dates for total sessions
     const uniqueDates = [...new Set(allAttendance.map((r) => r.date))];
     const totalSessions = uniqueDates.length || 1;
 
-    const topStudents = students
-      .map((s) => ({
-        id: s._id,
-        name: `${s.firstName} ${s.lastName}`,
-        initials: `${s.firstName[0]}${s.lastName[0]}`.toUpperCase(),
-        avatar: s.userId?.avatar || "",
-        attendanceRate: Math.round(((studentAttendance[s._id.toString()] || 0) / totalSessions) * 100),
-      }))
+    const topStudents = registeredUsers
+      .map((u) => {
+        const studentId = userIdToStudentId[u._id.toString()];
+        const count = studentId ? (studentAttendance[studentId] || 0) : 0;
+        return {
+          id: u._id,
+          name: u.name,
+          initials: u.initials,
+          avatar: u.avatar || "",
+          attendanceRate: Math.round((count / totalSessions) * 100),
+        };
+      })
       .sort((a, b) => b.attendanceRate - a.attendanceRate)
       .slice(0, 5);
 
     // Recent activity
     const recentRecords = await Attendance.find({ masterId })
-      .populate("studentId", "firstName lastName")
+      .populate({ path: "studentId", select: "firstName lastName userId", populate: { path: "userId", select: "name" } })
       .sort({ createdAt: -1 })
       .limit(10);
 
-    const recentActivity = recentRecords.map((r) => ({
-      id: r._id,
-      message: `${r.studentId ? `${r.studentId.firstName} ${r.studentId.lastName}` : "Student"} checked in`,
-      timestamp: `${r.date} ${r.time}`,
-      type: "attendance",
-    }));
-
-    // Add recent student registrations
-    const recentStudents = await Student.find({ masterId })
-      .sort({ createdAt: -1 })
-      .limit(5);
-
-    recentStudents.forEach((s) => {
-      recentActivity.push({
-        id: `reg-${s._id}`,
-        message: `New student registered: ${s.firstName} ${s.lastName}`,
-        timestamp: s.createdAt.toISOString().split("T")[0],
-        type: "registration",
-      });
-    });
-
-    recentActivity.sort((a, b) => {
-      if (a.timestamp > b.timestamp) return -1;
-      if (a.timestamp < b.timestamp) return 1;
-      return 0;
+    const recentActivity = recentRecords.map((r) => {
+      const stu = r.studentId;
+      const userName = stu?.userId?.name || (stu ? `${stu.firstName} ${stu.lastName}` : "Student");
+      return {
+        id: r._id,
+        message: `${userName} checked in`,
+        timestamp: `${r.date} ${r.time}`,
+        type: "attendance",
+      };
     });
 
     res.status(200).json({
@@ -108,7 +104,7 @@ exports.getMasterDashboard = async (req, res, next) => {
         stats: {
           totalStudents,
           presentToday,
-          absentToday,
+          absentToday: Math.max(0, totalStudents - presentToday),
           rate,
           totalSessions,
         },
@@ -184,9 +180,16 @@ exports.getStudentDashboard = async (req, res, next) => {
 exports.getReports = async (req, res, next) => {
   try {
     const masterId = req.user.role === "master" ? req.user._id : null;
-    const students = masterId
-      ? await Student.find({ masterId, status: "active" })
-      : await Student.find({ status: "active" });
+
+    // Get registered students from User model
+    let studentUsers;
+    if (masterId) {
+      const master = await User.findById(masterId);
+      const registeredIds = master?.registeredStudents || [];
+      studentUsers = await User.find({ _id: { $in: registeredIds } }).select("name avatar initials");
+    } else {
+      studentUsers = await User.find({ role: "student" }).select("name avatar initials");
+    }
 
     const allAttendance = masterId
       ? await Attendance.find({ masterId })
@@ -194,6 +197,12 @@ exports.getReports = async (req, res, next) => {
 
     const uniqueDates = [...new Set(allAttendance.map((r) => r.date))];
     const totalSessions = uniqueDates.length || 1;
+
+    // Build userId -> studentDocId map
+    const userIds = studentUsers.map((u) => u._id);
+    const studentDocs = await Student.find({ userId: { $in: userIds } });
+    const userIdToStudentId = {};
+    studentDocs.forEach((s) => { userIdToStudentId[s.userId.toString()] = s._id.toString(); });
 
     const studentAttendance = {};
     allAttendance.forEach((r) => {
@@ -203,12 +212,13 @@ exports.getReports = async (req, res, next) => {
       if (r.status === "late") studentAttendance[sid].late++;
     });
 
-    const report = students.map((s) => {
-      const data = studentAttendance[s._id.toString()] || { present: 0, late: 0 };
+    const report = studentUsers.map((u) => {
+      const studentId = userIdToStudentId[u._id.toString()];
+      const data = studentId ? (studentAttendance[studentId] || { present: 0, late: 0 }) : { present: 0, late: 0 };
       const totalPresent = data.present + data.late;
       return {
-        id: s._id,
-        name: `${s.firstName} ${s.lastName}`,
+        id: u._id,
+        name: u.name,
         present: totalPresent,
         absent: totalSessions - totalPresent,
         rate: Math.round((totalPresent / totalSessions) * 100),
