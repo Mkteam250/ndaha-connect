@@ -102,6 +102,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    lateTime: {
+      type: String,
+      default: "09:00",
+    },
   },
   {
     timestamps: true,

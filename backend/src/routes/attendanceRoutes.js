@@ -10,6 +10,9 @@ const {
   getStudentsAttendanceStatus,
   updateMasterLocation,
   getMasterLocation,
+  getLateTime,
+  updateLateTime,
+  deleteAttendance,
 } = require("../controllers/attendanceController");
 
 router.use(protect);
@@ -26,5 +29,12 @@ router.get("/students-status", authorize("master"), getStudentsAttendanceStatus)
 // Location-based check-in routes
 router.get("/location", authorize("master"), getMasterLocation);
 router.put("/location", authorize("master"), updateMasterLocation);
+
+// Late time setting routes
+router.get("/late-time", authorize("master"), getLateTime);
+router.put("/late-time", authorize("master"), updateLateTime);
+
+// Delete attendance record (master can delete to allow rescan)
+router.delete("/:id", authorize("master"), deleteAttendance);
 
 module.exports = router;

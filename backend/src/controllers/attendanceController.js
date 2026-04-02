@@ -112,8 +112,13 @@ exports.checkIn = async (req, res, next) => {
 
     const now = new Date();
     const time = now.toTimeString().split(" ")[0].substring(0, 5);
-    const hour = now.getHours();
-    const status = hour >= 9 ? "late" : "present";
+
+    // Determine late threshold from master's setting
+    const lateTime = master.lateTime || "09:00";
+    const [lateHour, lateMin] = lateTime.split(":").map(Number);
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const lateThresholdMinutes = lateHour * 60 + lateMin;
+    const status = currentMinutes >= lateThresholdMinutes ? "late" : "present";
 
     const attendance = await Attendance.create({
       studentId: student._id,
@@ -432,6 +437,68 @@ exports.getMasterLocation = async (req, res, next) => {
         locationLng: master.locationLng,
         locationUpdatedAt: master.locationUpdatedAt,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get master's late time setting
+exports.getLateTime = async (req, res, next) => {
+  try {
+    const master = await User.findById(req.user._id).select("lateTime");
+
+    res.status(200).json({
+      success: true,
+      data: {
+        lateTime: master.lateTime || "09:00",
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update master's late time setting
+exports.updateLateTime = async (req, res, next) => {
+  try {
+    const { lateTime } = req.body;
+    const masterId = req.user._id;
+
+    if (!lateTime || !/^\d{2}:\d{2}$/.test(lateTime)) {
+      return next(new AppError("Invalid late time format. Use HH:MM (e.g. 09:00)", 400));
+    }
+
+    const master = await User.findByIdAndUpdate(masterId, { lateTime }, { new: true });
+
+    res.status(200).json({
+      success: true,
+      message: `Late time updated to ${lateTime}`,
+      data: {
+        lateTime: master.lateTime,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete an attendance record (so student can scan again)
+exports.deleteAttendance = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const masterId = req.user._id;
+
+    const record = await Attendance.findOne({ _id: id, masterId });
+    if (!record) {
+      return next(new AppError("Attendance record not found", 404));
+    }
+
+    await Attendance.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Attendance record deleted. Student can check in again.",
     });
   } catch (error) {
     next(error);

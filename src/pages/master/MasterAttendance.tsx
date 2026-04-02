@@ -25,6 +25,8 @@ import {
   Mail,
   Shield,
   ShieldOff,
+  Trash2,
+  Settings,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +66,13 @@ export default function MasterAttendance() {
   // Location state
   const [locationEnforced, setLocationEnforced] = useState(false);
   const [togglingLocation, setTogglingLocation] = useState(false);
+
+  // Late time state
+  const [lateTime, setLateTime] = useState("09:00");
+  const [updatingLateTime, setUpdatingLateTime] = useState(false);
+
+  // Delete state
+  const [deletingAttendance, setDeletingAttendance] = useState<string | null>(null);
 
   // Today's check-ins (from QR scans)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
@@ -130,6 +139,11 @@ export default function MasterAttendance() {
       try {
         const locRes = await api.getMasterLocation();
         setLocationEnforced(locRes.data?.locationEnabled || false);
+      } catch { /* silent */ }
+      // Load late time setting
+      try {
+        const ltRes = await api.getLateTime();
+        setLateTime(ltRes.data?.lateTime || "09:00");
       } catch { /* silent */ }
       setLoading(false);
     };
@@ -284,6 +298,35 @@ export default function MasterAttendance() {
     }
   };
 
+  const handleUpdateLateTime = async (newTime: string) => {
+    setUpdatingLateTime(true);
+    try {
+      const res = await api.updateLateTime(newTime);
+      setLateTime(res.data?.lateTime || newTime);
+      toast({ title: `Late time set to ${newTime}` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update late time";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setUpdatingLateTime(false);
+    }
+  };
+
+  const handleDeleteAttendance = async (attendanceId: string) => {
+    setDeletingAttendance(attendanceId);
+    try {
+      await api.deleteAttendance(attendanceId);
+      toast({ title: "Attendance deleted. Student can check in again." });
+      fetchTodayAttendance();
+      fetchMyStudents();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete attendance";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setDeletingAttendance(null);
+    }
+  };
+
   const presentCount = myStudents.filter((s) => s.todayStatus?.status === "present").length;
   const lateCount = myStudents.filter((s) => s.todayStatus?.status === "late").length;
   const absentCount = myStudents.filter((s) => s.todayStatus?.status === "absent").length;
@@ -348,6 +391,33 @@ export default function MasterAttendance() {
               </>
             )}
           </Button>
+        </div>
+      </motion.div>
+
+      {/* Late Time Setting */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-xl border border-border bg-card p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-warning/10">
+              <Clock className="w-5 h-5 text-warning" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Late Threshold</p>
+              <p className="text-xs text-muted-foreground">
+                Students checking in after this time will be marked as late. Current: <span className="font-medium text-warning">{lateTime}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="time"
+              value={lateTime}
+              onChange={(e) => handleUpdateLateTime(e.target.value)}
+              disabled={updatingLateTime}
+              className="w-32 h-9"
+            />
+            {updatingLateTime && <Loader2 className="w-4 h-4 text-master animate-spin" />}
+          </div>
         </div>
       </motion.div>
 
@@ -453,6 +523,19 @@ export default function MasterAttendance() {
                         <p className="text-xs text-muted-foreground">{a.time} {a.status === "late" && <span className="text-warning">(late)</span>}</p>
                       </div>
                       <CheckCircle2 className="w-4 h-4 text-student shrink-0" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteAttendance(a.id)}
+                        disabled={deletingAttendance === a.id}
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                      >
+                        {deletingAttendance === a.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
                     </motion.div>
                   ))
                 )}
@@ -579,14 +662,29 @@ export default function MasterAttendance() {
                             </Button>
                           </>
                         ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setViewStudent(s)}
-                            className="h-8 px-2 text-xs"
-                          >
-                            <Eye className="w-3 h-3 mr-1" /> View
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setViewStudent(s)}
+                              className="h-8 px-2 text-xs"
+                            >
+                              <Eye className="w-3 h-3 mr-1" /> View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteAttendance(s.todayStatus!.id)}
+                              disabled={deletingAttendance === s.todayStatus!.id}
+                              className="h-8 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                            >
+                              {deletingAttendance === s.todayStatus!.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3 h-3" />
+                              )}
+                            </Button>
+                          </>
                         )}
                       </div>
                     </motion.div>
@@ -671,6 +769,23 @@ export default function MasterAttendance() {
                       </Button>
                     ))}
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      handleDeleteAttendance(viewStudent.todayStatus!.id);
+                      setViewStudent(null);
+                    }}
+                    disabled={deletingAttendance === viewStudent.todayStatus.id}
+                    className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  >
+                    {deletingAttendance === viewStudent.todayStatus.id ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3 mr-1" />
+                    )}
+                    Delete Attendance (Allow Rescan)
+                  </Button>
                 </div>
               )}
             </div>

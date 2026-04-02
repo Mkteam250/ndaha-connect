@@ -381,6 +381,17 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  getLateTime: () =>
+    request<{ lateTime: string }>("/attendance/late-time"),
+  updateLateTime: (lateTime: string) =>
+    request<{ lateTime: string }>("/attendance/late-time", {
+      method: "PUT",
+      body: JSON.stringify({ lateTime }),
+    }),
+  deleteAttendance: (id: string) =>
+    request(`/attendance/${id}`, {
+      method: "DELETE",
+    }),
 
   // QR
   generateQR: () =>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AvatarBadge } from "@/components/ui/avatar-badge";
+import { Badge } from "@/components/ui/badge";
 import { api, type AttendanceRecord } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -95,7 +96,7 @@ export default function MasterCalendar() {
               ))}
               {days.map((date, i) => {
                 if (!date) return <div key={`empty-${i}`} />;
-                const key = date.toISOString().split("T")[0];
+                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
                 const data = calendarData[key];
                 const isToday = isCurrentMonth && date.getDate() === today.getDate();
                 const isSelected = selectedDay === key;
@@ -157,6 +158,17 @@ export default function MasterCalendar() {
                             <p className="text-sm font-medium text-foreground truncate">{a.studentName}</p>
                             <p className="text-xs text-muted-foreground">{a.time}</p>
                           </div>
+                          <Badge
+                            className={`text-xs border-0 shrink-0 ${
+                              a.status === "present"
+                                ? "bg-student-muted text-student"
+                                : a.status === "late"
+                                ? "bg-warning/20 text-warning"
+                                : "bg-destructive/10 text-destructive"
+                            }`}
+                          >
+                            {a.status}
+                          </Badge>
                         </div>
                       ))}
                     </div>
