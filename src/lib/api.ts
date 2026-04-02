@@ -130,6 +130,7 @@ export interface TopStudent {
   id: string;
   name: string;
   initials: string;
+  avatar: string;
   attendanceRate: number;
 }
 
@@ -156,6 +157,7 @@ export interface StudentDashboardData {
     initials: string;
     masterName: string;
     masterId: string;
+    masterAvatar: string;
     enrolledDate: string;
   } | null;
   stats: {
@@ -214,6 +216,31 @@ export interface AdminStudent {
   province: string | null;
   masterCount: number;
   createdAt: string;
+}
+
+export interface SearchStudent {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  initials: string;
+  bio: string | null;
+  country: string | null;
+  province: string | null;
+  district: string | null;
+  subject: string | null;
+  masterCount: number;
+  createdAt: string;
+  isRegistered: boolean;
+}
+
+export interface SearchStudentsParams {
+  search?: string;
+  department?: string;
+  sortBy?: "name" | "email" | "createdAt" | "country";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
 }
 
 export interface AdminRecentUser {
@@ -340,6 +367,13 @@ export const api = {
     request<{ calendarData: Record<string, { attended: number; total: number; records: AttendanceRecord[] }> }>(
       `/attendance/calendar?year=${year}&month=${month}`
     ),
+  markManualAttendance: (studentId: string, status: "present" | "late" | "absent" = "present") =>
+    request<{ attendance: { id: string; status: string; date: string; time: string } }>("/attendance/manual", {
+      method: "POST",
+      body: JSON.stringify({ studentId, status }),
+    }),
+  getStudentsAttendanceStatus: () =>
+    request<{ students: Array<{ id: string; name: string; email: string; avatar: string | null; initials: string; country: string | null; province: string | null; todayStatus: { status: string; time: string; id: string } | null }> }>("/attendance/students-status"),
 
   // QR
   generateQR: () =>
@@ -377,6 +411,19 @@ export const api = {
 
   // Masters (master-facing)
   getMyStudents: () => request<{ students: RegisteredStudent[]; count: number; studentLimit: number }>("/masters/my-students"),
+  searchAllStudents: (params?: SearchStudentsParams) => {
+    const query = new URLSearchParams();
+    if (params?.search) query.set("search", params.search);
+    if (params?.department) query.set("department", params.department);
+    if (params?.sortBy) query.set("sortBy", params.sortBy);
+    if (params?.order) query.set("order", params.order);
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    return request<{ students: SearchStudent[]; total: number; studentLimit: number; registeredCount: number; count: number }>(`/masters/all-students${qs ? `?${qs}` : ""}`);
+  },
+  registerStudent: (studentId: string) =>
+    request(`/masters/students/${studentId}`, { method: "POST" }),
   removeStudent: (studentId: string) =>
     request(`/masters/students/${studentId}`, { method: "DELETE" }),
 
@@ -386,6 +433,16 @@ export const api = {
     request<{ user: UserProfile }>("/profile/me", {
       method: "PUT",
       body: JSON.stringify(body),
+    }),
+  uploadAvatar: (avatar: string) =>
+    request<{ avatar: string }>("/profile/avatar", {
+      method: "POST",
+      body: JSON.stringify({ avatar }),
+    }),
+  updateUserAvatar: (id: string, avatar: string) =>
+    request<{ avatar: string }>(`/profile/${id}/avatar`, {
+      method: "PUT",
+      body: JSON.stringify({ avatar }),
     }),
   getUserProfile: (id: string) => request<{ user: UserProfile }>(`/profile/${id}`),
 

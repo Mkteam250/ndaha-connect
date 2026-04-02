@@ -9,6 +9,8 @@ const {
   getMyStudents,
   getMyMasters,
   removeStudent,
+  searchAllStudents,
+  registerStudent,
 } = require("../controllers/masterController");
 
 // Public - browse masters (also used by students)
@@ -21,6 +23,8 @@ router.delete("/:id/unregister", protect, authorize("student"), unregisterFromMa
 
 // Master routes
 router.get("/my-students", protect, authorize("master"), getMyStudents);
+router.get("/all-students", protect, authorize("master"), searchAllStudents);
+router.post("/students/:studentId", protect, authorize("master"), registerStudent);
 router.delete("/students/:studentId", protect, authorize("master"), removeStudent);
 
 // Get single master profile

@@ -43,13 +43,42 @@ exports.getStats = async (req, res, next) => {
 // Get all masters (admin)
 exports.getAllMasters = async (req, res, next) => {
   try {
-    const masters = await User.find({ role: "master" })
-      .select("name email avatar bio subject status studentLimit registeredStudents createdAt")
-      .sort({ createdAt: -1 });
+    const { search, sortBy = "createdAt", order = "desc", page = 1, limit = 50 } = req.query;
+
+    const query = { role: "master" };
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { subject: searchRegex },
+      ];
+    }
+
+    const sortOptions = {};
+    const validSortFields = ["name", "email", "createdAt", "status"];
+    if (validSortFields.includes(sortBy)) {
+      sortOptions[sortBy] = order === "desc" ? -1 : 1;
+    } else {
+      sortOptions.createdAt = -1;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [masters, total] = await Promise.all([
+      User.find(query)
+        .select("name email avatar bio subject status studentLimit registeredStudents createdAt")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(query),
+    ]);
 
     res.status(200).json({
       success: true,
       count: masters.length,
+      total,
       data: {
         masters: masters.map((m) => ({
           id: m._id,
@@ -74,13 +103,43 @@ exports.getAllMasters = async (req, res, next) => {
 // Get all students (admin)
 exports.getAllStudents = async (req, res, next) => {
   try {
-    const students = await User.find({ role: "student" })
-      .select("name email avatar bio country province registeredMasters createdAt")
-      .sort({ createdAt: -1 });
+    const { search, sortBy = "createdAt", order = "desc", page = 1, limit = 50 } = req.query;
+
+    const query = { role: "student" };
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { country: searchRegex },
+        { province: searchRegex },
+      ];
+    }
+
+    const sortOptions = {};
+    const validSortFields = ["name", "email", "createdAt", "country"];
+    if (validSortFields.includes(sortBy)) {
+      sortOptions[sortBy] = order === "desc" ? -1 : 1;
+    } else {
+      sortOptions.createdAt = -1;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [students, total] = await Promise.all([
+      User.find(query)
+        .select("name email avatar bio country province registeredMasters createdAt")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(query),
+    ]);
 
     res.status(200).json({
       success: true,
       count: students.length,
+      total,
       data: {
         students: students.map((s) => ({
           id: s._id,

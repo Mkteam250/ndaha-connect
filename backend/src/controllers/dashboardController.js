@@ -1,4 +1,5 @@
 const Student = require("../models/Student");
+const User = require("../models/User");
 const Attendance = require("../models/Attendance");
 
 exports.getMasterDashboard = async (req, res, next) => {
@@ -43,7 +44,7 @@ exports.getMasterDashboard = async (req, res, next) => {
     }
 
     // Top students by attendance
-    const students = await Student.find({ masterId, status: "active" });
+    const students = await Student.find({ masterId, status: "active" }).populate("userId", "avatar");
     const allAttendance = await Attendance.find({ masterId });
 
     const studentAttendance = {};
@@ -62,6 +63,7 @@ exports.getMasterDashboard = async (req, res, next) => {
         id: s._id,
         name: `${s.firstName} ${s.lastName}`,
         initials: `${s.firstName[0]}${s.lastName[0]}`.toUpperCase(),
+        avatar: s.userId?.avatar || "",
         attendanceRate: Math.round(((studentAttendance[s._id.toString()] || 0) / totalSessions) * 100),
       }))
       .sort((a, b) => b.attendanceRate - a.attendanceRate)
@@ -122,7 +124,7 @@ exports.getMasterDashboard = async (req, res, next) => {
 
 exports.getStudentDashboard = async (req, res, next) => {
   try {
-    const student = await Student.findOne({ userId: req.user._id }).populate("masterId", "name email");
+    const student = await Student.findOne({ userId: req.user._id }).populate("masterId", "name email avatar");
     if (!student) {
       return res.status(200).json({
         success: true,
@@ -162,6 +164,7 @@ exports.getStudentDashboard = async (req, res, next) => {
           initials: `${student.firstName[0]}${student.lastName[0]}`.toUpperCase(),
           masterName: student.masterId?.name || "No master assigned",
           masterId: student.masterId?._id,
+          masterAvatar: student.masterId?.avatar || "",
           enrolledDate: student.enrolledDate,
         },
         stats: {

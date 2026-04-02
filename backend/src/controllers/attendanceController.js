@@ -1,5 +1,6 @@
 const Attendance = require("../models/Attendance");
 const Student = require("../models/Student");
+const User = require("../models/User");
 const AppError = require("../utils/AppError");
 
 exports.checkIn = async (req, res, next) => {
@@ -176,6 +177,109 @@ exports.getCalendarData = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: { calendarData },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Manual attendance marking by master
+exports.manualAttendance = async (req, res, next) => {
+  try {
+    const masterId = req.user._id;
+    const { studentId, status = "present" } = req.body;
+
+    if (!studentId) {
+      return next(new AppError("Student ID is required", 400));
+    }
+
+    if (!["present", "late", "absent"].includes(status)) {
+      return next(new AppError("Invalid status. Use present, late, or absent.", 400));
+    }
+
+    // Verify the student is registered under this master
+    const master = await User.findById(masterId);
+    if (!master.registeredStudents.includes(studentId)) {
+      return next(new AppError("Student is not registered under you", 403));
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    const existing = await Attendance.findOne({ studentId, masterId, date: today });
+
+    if (existing) {
+      // Update existing record
+      existing.status = status;
+      existing.time = new Date().toTimeString().split(" ")[0].substring(0, 5);
+      await existing.save();
+
+      const student = await User.findById(studentId);
+      return res.status(200).json({
+        success: true,
+        message: `Attendance updated for ${student?.name || "student"}`,
+        data: { attendance: { id: existing._id, status: existing.status, date: existing.date, time: existing.time } },
+      });
+    }
+
+    const now = new Date();
+    const time = now.toTimeString().split(" ")[0].substring(0, 5);
+
+    const attendance = await Attendance.create({
+      studentId,
+      masterId,
+      qrSessionId: null,
+      date: today,
+      time,
+      status,
+    });
+
+    const student = await User.findById(studentId);
+
+    res.status(201).json({
+      success: true,
+      message: `${student?.name || "Student"} marked as ${status}`,
+      data: { attendance: { id: attendance._id, status: attendance.status, date: attendance.date, time: attendance.time } },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get master's registered students with today's attendance status
+exports.getStudentsAttendanceStatus = async (req, res, next) => {
+  try {
+    const masterId = req.user._id;
+    const today = new Date().toISOString().split("T")[0];
+
+    const master = await User.findById(masterId).populate(
+      "registeredStudents",
+      "name email avatar country province initials"
+    );
+
+    if (!master) {
+      return next(new AppError("Master not found", 404));
+    }
+
+    const todayRecords = await Attendance.find({ masterId, date: today });
+    const attendanceMap = {};
+    todayRecords.forEach((r) => {
+      attendanceMap[r.studentId.toString()] = { status: r.status, time: r.time, id: r._id };
+    });
+
+    const students = (master.registeredStudents || []).map((s) => ({
+      id: s._id,
+      name: s.name,
+      email: s.email,
+      avatar: s.avatar,
+      initials: s.initials,
+      country: s.country,
+      province: s.province,
+      todayStatus: attendanceMap[s._id.toString()] || null,
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: students.length,
+      data: { students },
     });
   } catch (error) {
     next(error);

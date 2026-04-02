@@ -94,9 +94,13 @@ export default function StudentBrowseMasters() {
               className="rounded-xl border border-border bg-card p-5 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-14 h-14 rounded-full bg-master-muted text-master flex items-center justify-center text-lg font-bold shrink-0">
-                  {m.initials}
-                </div>
+                {m.avatar ? (
+                  <img src={m.avatar} alt={m.name} className="w-14 h-14 rounded-full object-cover ring-2 ring-master-muted shrink-0" />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-master-muted text-master flex items-center justify-center text-lg font-bold shrink-0">
+                    {m.initials}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold text-foreground truncate">{m.name}</h3>
                   {m.subject && (
@@ -167,9 +171,13 @@ export default function StudentBrowseMasters() {
           {viewMaster && (
             <div className="mt-6 space-y-5">
               <div className="flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full bg-master-muted text-master flex items-center justify-center text-2xl font-bold">
-                  {viewMaster.initials}
-                </div>
+                {viewMaster.avatar ? (
+                  <img src={viewMaster.avatar} alt={viewMaster.name} className="w-20 h-20 rounded-full object-cover ring-2 ring-master-muted" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-master-muted text-master flex items-center justify-center text-2xl font-bold">
+                    {viewMaster.initials}
+                  </div>
+                )}
                 <h2 className="text-lg font-semibold text-foreground mt-3">{viewMaster.name}</h2>
                 {viewMaster.subject && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1">

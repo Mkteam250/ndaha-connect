@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AvatarUpload } from "@/components/ui/avatar-upload";
 import { motion } from "framer-motion";
 import { Pencil, MapPin, Mail, Phone, GraduationCap, Save, X, User } from "lucide-react";
 import { api, type UserProfile } from "@/lib/api";
@@ -14,6 +15,7 @@ export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -51,6 +53,20 @@ export default function StudentProfile() {
     };
     fetchProfile();
   }, []);
+
+  const handleAvatarUpload = async (base64: string) => {
+    setUploadingAvatar(true);
+    try {
+      const res = await api.uploadAvatar(base64);
+      setProfile((prev) => prev ? { ...prev, avatar: res.data?.avatar || null } : null);
+      toast({ title: "Photo updated" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to upload photo";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -133,9 +149,14 @@ export default function StudentProfile() {
           <div className="rounded-xl border border-border bg-card p-6">
             <h3 className="text-sm font-semibold text-foreground mb-4">Profile Preview</h3>
             <div className="flex flex-col items-center">
-              <div className="w-24 h-24 rounded-full bg-student-muted text-student flex items-center justify-center text-3xl font-bold">
-                {initials}
-              </div>
+              <AvatarUpload
+                currentAvatar={profile.avatar}
+                initials={initials}
+                size="xl"
+                accentClass="bg-student-muted text-student"
+                onUpload={handleAvatarUpload}
+                disabled={uploadingAvatar}
+              />
               <h2 className="text-lg font-semibold text-foreground mt-3">{form.name || "Your Name"}</h2>
               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                 <Mail className="w-3.5 h-3.5" /> {profile.email}
@@ -151,7 +172,7 @@ export default function StudentProfile() {
               )}
               {(form.country || form.province) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="w-3.5 h-3.5" /> {[form.country, form.province, form.district].filter(Boolean).join(", ") || "—"}
+                  <MapPin className="w-3.5 h-3.5" /> {[form.country, form.province, form.district].filter(Boolean).join(", ") || "\u2014"}
                 </div>
               )}
               {form.subject && (
@@ -171,9 +192,13 @@ export default function StudentProfile() {
                 <p className="text-xs font-medium text-muted-foreground mb-3">Registered Masters</p>
                 {profile.registeredMasters.map((m) => (
                   <div key={m.id} className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-full bg-master-muted text-master flex items-center justify-center text-xs font-bold">
-                      {m.initials}
-                    </div>
+                    {m.avatar ? (
+                      <img src={m.avatar} alt={m.name} className="w-7 h-7 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-master-muted text-master flex items-center justify-center text-xs font-bold">
+                        {m.initials}
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm font-medium text-foreground">{m.name}</p>
                       {m.subject && <p className="text-xs text-muted-foreground">{m.subject}</p>}

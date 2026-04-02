@@ -1,6 +1,134 @@
 const User = require("../models/User");
 const AppError = require("../utils/AppError");
 
+// Search all students in the system (for master to find and register)
+exports.searchAllStudents = async (req, res, next) => {
+  try {
+    const { search, department, sortBy = "name", order = "asc", page = 1, limit = 20 } = req.query;
+    const masterId = req.user._id;
+
+    const query = { role: "student" };
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { country: searchRegex },
+        { province: searchRegex },
+      ];
+    }
+
+    if (department) {
+      query.subject = new RegExp(department, "i");
+    }
+
+    const sortOptions = {};
+    const validSortFields = ["name", "email", "createdAt", "country"];
+    if (validSortFields.includes(sortBy)) {
+      sortOptions[sortBy] = order === "desc" ? -1 : 1;
+    } else {
+      sortOptions.name = 1;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [students, total] = await Promise.all([
+      User.find(query)
+        .select("name email avatar bio country province district subject registeredMasters createdAt")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(query),
+    ]);
+
+    // Get master's current students to mark which are already registered
+    const master = await User.findById(masterId).select("registeredStudents studentLimit");
+    const registeredIds = (master.registeredStudents || []).map((id) => id.toString());
+
+    const formatted = students.map((s) => ({
+      id: s._id,
+      name: s.name,
+      email: s.email,
+      avatar: s.avatar,
+      initials: s.initials,
+      bio: s.bio,
+      country: s.country,
+      province: s.province,
+      district: s.district,
+      subject: s.subject,
+      masterCount: s.registeredMasters ? s.registeredMasters.length : 0,
+      createdAt: s.createdAt,
+      isRegistered: registeredIds.includes(s._id.toString()),
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: formatted.length,
+      total,
+      studentLimit: master.studentLimit,
+      registeredCount: registeredIds.length,
+      data: { students: formatted },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Master manually registers a student
+exports.registerStudent = async (req, res, next) => {
+  try {
+    const studentId = req.params.studentId;
+    const masterId = req.user._id;
+
+    const [master, student] = await Promise.all([
+      User.findOne({ _id: masterId, role: "master" }),
+      User.findOne({ _id: studentId, role: "student" }),
+    ]);
+
+    if (!master) {
+      return next(new AppError("Master not found", 404));
+    }
+    if (!student) {
+      return next(new AppError("Student not found", 404));
+    }
+
+    if (master.registeredStudents.includes(studentId)) {
+      return next(new AppError("Student is already registered under you", 400));
+    }
+
+    if (master.registeredStudents.length >= master.studentLimit) {
+      return next(new AppError(`Student limit of ${master.studentLimit} reached`, 400));
+    }
+
+    // Add student to master's list
+    master.registeredStudents.push(studentId);
+    await master.save();
+
+    // Add master to student's list
+    if (!student.registeredMasters.includes(masterId)) {
+      student.registeredMasters.push(masterId);
+      await student.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully registered ${student.name}`,
+      data: {
+        student: {
+          id: student._id,
+          name: student.name,
+          email: student.email,
+          avatar: student.avatar,
+          initials: student.initials,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Get all masters (for students to browse)
 exports.getAllMasters = async (req, res, next) => {
   try {

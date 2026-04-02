@@ -15,7 +15,7 @@ const attendanceSchema = new mongoose.Schema(
     qrSessionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "QRSession",
-      required: true,
+      default: null,
     },
     date: {
       type: String,

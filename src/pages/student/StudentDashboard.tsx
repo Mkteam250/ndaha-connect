@@ -146,9 +146,13 @@ export default function StudentDashboard() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-6 rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground mb-4">Your Master</h3>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-master-muted text-master flex items-center justify-center text-lg font-bold">
-            {profile.masterName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-          </div>
+          {profile.masterAvatar ? (
+            <img src={profile.masterAvatar} alt={profile.masterName} className="w-12 h-12 rounded-full object-cover ring-2 ring-master-muted" />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-master-muted text-master flex items-center justify-center text-lg font-bold">
+              {profile.masterName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+            </div>
+          )}
           <div>
             <p className="font-medium text-foreground">{profile.masterName}</p>
             <p className="text-sm text-muted-foreground">Enrolled since {new Date(profile.enrolledDate).toLocaleDateString("en", { month: "long", year: "numeric" })}</p>

@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 
 const authRoutes = require("./routes/authRoutes");
 const studentRoutes = require("./routes/studentRoutes");
@@ -19,8 +20,11 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || "http://localhost:8080",
   credentials: true,
 }));
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// ── Serve uploaded files ──────────────────────────────────
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));

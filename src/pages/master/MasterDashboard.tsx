@@ -123,7 +123,11 @@ export default function MasterDashboard() {
             {topStudents.map((s, i) => (
               <div key={s.id} className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground w-5">{i + 1}</span>
-                <AvatarBadge initials={s.initials} size="sm" accentClass="bg-master-muted text-master" />
+                {s.avatar ? (
+                  <img src={s.avatar} alt={s.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                ) : (
+                  <AvatarBadge initials={s.initials} size="sm" accentClass="bg-master-muted text-master" />
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
                 </div>

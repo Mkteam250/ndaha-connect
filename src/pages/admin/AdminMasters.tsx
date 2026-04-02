@@ -121,8 +121,15 @@ export default function AdminMasters() {
                 <motion.tr key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <AvatarBadge initials={m.initials} size="sm" accentClass="bg-admin-muted text-admin" />
-                      <span className="font-medium text-foreground">{m.name}</span>
+                      {m.avatar ? (
+                        <img src={m.avatar} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <AvatarBadge initials={m.initials} size="sm" accentClass="bg-admin-muted text-admin" />
+                      )}
+                      <div>
+                        <span className="font-medium text-foreground">{m.name}</span>
+                        {m.subject && <p className="text-xs text-muted-foreground hidden lg:block">{m.subject}</p>}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{m.email}</td>
@@ -164,7 +171,11 @@ export default function AdminMasters() {
           {viewMaster && (
             <div className="mt-6 space-y-4">
               <div className="flex justify-center">
-                <AvatarBadge initials={viewMaster.initials} size="lg" accentClass="bg-master-muted text-master" />
+                {viewMaster.avatar ? (
+                  <img src={viewMaster.avatar} alt={viewMaster.name} className="w-20 h-20 rounded-full object-cover ring-2 ring-master-muted" />
+                ) : (
+                  <AvatarBadge initials={viewMaster.initials} size="lg" accentClass="bg-master-muted text-master" />
+                )}
               </div>
               <div className="text-center">
                 <p className="text-lg font-semibold text-foreground">{viewMaster.name}</p>
